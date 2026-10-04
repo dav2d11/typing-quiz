@@ -37,7 +37,7 @@
     padding-left:max(16px, env(safe-area-inset-left));
     padding-right:max(16px, env(safe-area-inset-right));
   }
-  .app{ width:100%; max-width:960px; transition:max-width .15s ease; }
+  .app{ width:100%; max-width:960px; }
   .app.wide{ max-width:1180px; }
   h1{ text-align:center; font-size:28px; margin-bottom:4px; letter-spacing:2px; }
   .subtitle{ text-align:center; color:var(--sub); margin-bottom:20px; font-size:14px; }
@@ -91,7 +91,7 @@
   .hud{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:14px; color:var(--sub); }
   .timer-info{ display:flex; justify-content:space-between; font-size:11px; color:var(--sub); margin-bottom:4px; }
   .timer-bar-outer{ height:8px; background:#0f172a; border-radius:999px; overflow:hidden; margin-bottom:20px; }
-  .timer-bar-inner{ height:100%; background:var(--accent); width:100%; transition:width .1s linear, background-color .3s; }
+  .timer-bar-inner{ height:100%; background:var(--accent); width:100%; transform-origin:left center; will-change:transform; transition:background-color .3s; }
   .target-zone{ position:relative; text-align:center; padding:36px 12px; min-height:160px; display:flex; align-items:center; justify-content:center; }
   .question-text{ font-size:22px; font-weight:600; line-height:1.5; }
   .answer-input{
@@ -558,8 +558,7 @@
   .m-timer-outer { height: 10px; background: #1e293b; overflow: hidden; }
   .m-timer-inner {
     height: 100%; background: #38bdf8; width: 100%;
-    transition: width .1s linear, background-color .3s;
-    box-shadow: 0 0 10px currentColor;
+    transform-origin: left center; will-change: transform; transition: background-color .3s;
   }
   .m-game-top.urgent #m-timeNum { color: #f87171; animation: mPulse .5s ease-in-out infinite alternate; }
   .m-game-top.urgent .m-timer-inner { animation: mBlink .5s ease-in-out infinite alternate; }
@@ -748,6 +747,22 @@
     background: rgba(255,255,255,.25); border: none; color: #fff;
     width: 40px; height: 40px; border-radius: 999px; font-size: 20px; cursor: pointer;
   }
+.ico-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:8px;background:transparent;border:1px solid var(--bad);color:var(--bad);cursor:pointer;touch-action:manipulation;flex-shrink:0}
+.ico-btn.edit{border-color:var(--accent);color:var(--accent)}
+.ico-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.wrong-actions{display:flex;gap:8px;margin-top:8px}
+.m-wrong-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.wrong-item,.m-wrong-item{content-visibility:auto;contain-intrinsic-size:auto 90px}
+.m-game-img-area{contain:layout paint}
+.qe{position:fixed;inset:0;z-index:10050;background:rgba(2,6,23,.75);display:flex;align-items:center;justify-content:center;padding:12px}
+.qe-card{width:100%;max-width:520px;max-height:100%;overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--panel-light);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.qe-card label{font-size:12px;color:var(--sub);display:block}
+.qe-card input[type=text],.qe-card textarea{width:100%;margin-top:4px;padding:10px 12px;border-radius:8px;border:1px solid var(--panel-light);background:#0f172a;color:var(--text);font:inherit;font-size:16px;outline:none}
+.qe-card img{max-width:100%;max-height:150px;border-radius:8px;display:block}
+.qe-row{display:flex;gap:8px}.qe-row>*{flex:1}
+.qe-card .ghost-btn{text-align:center;padding:11px;margin:0;color:var(--text)}
+.qe-foot .primary-btn{flex:2}
+@media(max-width:680px){.qe{align-items:flex-end;padding:0}.qe-card{max-width:none;border-radius:16px 16px 0 0}}
 </style>
 </head>
 <body>
@@ -1187,6 +1202,15 @@
 
 </div>
 
+<div id="qe" class="qe hidden"><div class="qe-card">
+<div class="qe-row"><label>과목<input type="text" id="qeS"></label><label>주제<input type="text" id="qeT"></label></div>
+<label>질문<textarea id="qeQ" rows="3"></textarea></label>
+<div id="qeImgBox" class="hidden"><img id="qeImg" alt=""></div>
+<div class="qe-row"><label class="ghost-btn">사진 추가/변경<input type="file" id="qeF" accept="image/*" class="hidden"></label><button type="button" class="ghost-btn hidden" id="qeRm">사진 삭제</button></div>
+<label>정답<input type="text" id="qeA"></label>
+<label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="qeK"> 정답 순서 맞춤</label>
+<div class="qe-row qe-foot"><button type="button" class="ghost-btn" id="qeX">취소</button><button type="button" class="primary-btn" id="qeOk">저장</button></div>
+</div></div>
 <script>
 /* =========================================================================
  * 1. 내장 퀴즈 데이터 (과목 > 주제 > 문제/정답 계층 구조)
@@ -1213,7 +1237,9 @@ const DB_NAME = 'TypingQuizDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'keyval';
 
-function getDB() {
+let _dbP = null;
+function getDB() { return _dbP || (_dbP = openDB().then(db => { if (!db) _dbP = null; else db.onclose = () => { _dbP = null; }; return db; })); }
+function openDB() {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) {
       resolve(null);
@@ -1295,27 +1321,43 @@ async function loadFromStorage(key) {
 }
 
 async function saveToStorage(key, valueObj) {
-  const json = JSON.stringify(valueObj);
-
-  // 1. window.storage
-  try {
-    if (window.storage && window.storage.set) {
-      await window.storage.set(key, json, false);
-    }
-  } catch (e) {}
-
-  // 2. IndexedDB 영구 저장 (용량 제한 없이 이미지 포함 데이터 완벽 저장)
-  try {
-    await idbSet(key, valueObj);
-  } catch (e) {}
-
-  // 3. localStorage 동기화 (용량 초과 에러가 나도 IndexedDB에 이미 안전하게 저장됨)
-  try {
-    localStorage.setItem(key, json);
-  } catch (e) {
-    // localStorage 5MB 초과 시 조용히 무시 (IndexedDB가 보존함)
-  }
+  let stored = false, idbOk = false;
+  try { if (window.storage && window.storage.set) { await window.storage.set(key, JSON.stringify(valueObj), false); stored = true; } } catch (e) {}
+  try { idbOk = await idbSet(key, valueObj); } catch (e) {}
+  // localStorage는 동기 방식이라 큰 데이터에서 화면이 멈추므로, IndexedDB가 실패했을 때만 사용
+  if (!idbOk && !stored) { try { localStorage.setItem(key, JSON.stringify(valueObj)); } catch (e) {} }
 }
+const pendingSaves = new Map(); let saveTimer = null;
+function queueSave(key, obj, delay = 2000) { pendingSaves.set(key, obj); clearTimeout(saveTimer); saveTimer = setTimeout(flushPendingSaves, delay); }
+async function flushPendingSaves() {
+  clearTimeout(saveTimer); saveTimer = null;
+  const list = [...pendingSaves]; pendingSaves.clear();
+  for (const [k, v] of list) await saveToStorage(k, v);
+}
+window.addEventListener('pagehide', flushPendingSaves);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPendingSaves(); });
+// 프레임 기반 타이머: 탭이 숨겨지면 멈추고, 바는 transform으로만 움직여 끊김이 없다
+function createFrameTimer(limitSec, onTick, onEnd) {
+  let left = limitSec, last = 0, raf = 0, dead = false;
+  const step = (now) => {
+    if (dead) return;
+    if (last) left -= Math.min(now - last, 100) / 1000;
+    last = now;
+    if (left <= 0) { dead = true; onTick(0); onEnd(); return; }
+    onTick(left); raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  return () => { dead = true; cancelAnimationFrame(raf); };
+}
+let _preRef = null;
+function preloadQuestionImage(q) {
+  if (!q || !q.img) { _preRef = null; return; }
+  const im = new Image(); im.decoding = 'async'; im.src = q.img;
+  if (im.decode) im.decode().catch(() => {});
+  _preRef = im;
+}
+const ICON_EDIT = '<svg viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L8 20l-5 1 1-5z"/><path d="M13 7l4 4"/></svg>';
+const ICON_DEL = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
 async function loadCustomData() { return (await loadFromStorage(STORAGE_KEY_CUSTOM)) || {}; }
 async function saveCustomData() { await saveToStorage(STORAGE_KEY_CUSTOM, CUSTOM_DATA); }
@@ -1973,14 +2015,14 @@ async function addToWrongNotes(question) {
     if (question.strict) entry.strict = true;
     WRONG_NOTES.push(entry);
   }
-  await saveWrongNotes();
+  queueSave(STORAGE_KEY_WRONG, WRONG_NOTES);
   renderWrongBadge();
 }
 async function removeFromWrongNotes(question) {
   const idx = findWrongIndex(question);
   if (idx >= 0) {
     WRONG_NOTES.splice(idx, 1);
-    await saveWrongNotes();
+    queueSave(STORAGE_KEY_WRONG, WRONG_NOTES);
     renderWrongBadge();
   }
 }
@@ -2001,29 +2043,22 @@ function renderWrongList() {
     wrongList.innerHTML = '<div class="empty-msg">오답노트가 비어 있습니다.</div>';
     return;
   }
+  const frag = document.createDocumentFragment();
   WRONG_NOTES.forEach((note) => {
     const item = document.createElement('div');
     item.className = 'wrong-item';
     item.innerHTML = `
-      <div class="meta">
-        <span>${note.subject} · ${note.topic}</span>
-        <span class="miss-count">틀린 횟수 ${note.missCount}</span>
-      </div>
-      ${note.img ? `<img src="${note.img}" style="max-height:80px;border-radius:6px;margin:6px 0;display:block;border:1px solid var(--panel-light);">` : ''}
-      <div class="q">${note.q || '<span style="color:var(--sub);font-style:italic;">(이미지 문제)</span>'}</div>
-      <div class="a">정답: ${note.a}${note.strict ? ' <span style="color:var(--accent2);font-weight:700;">· 🔀순서유지</span>' : ''}</div>
-    `;
-    const delBtn = document.createElement('button');
-    delBtn.className = 'del-btn';
-    delBtn.textContent = '✕';
-    delBtn.style.marginTop = '8px';
-    delBtn.onclick = async () => {
-      await removeFromWrongNotes(note);
-      renderWrongList();
-    };
-    item.appendChild(delBtn);
-    wrongList.appendChild(item);
+      <div class="meta"><span>${mobEsc(note.subject)} · ${mobEsc(note.topic)}</span><span class="miss-count">틀린 횟수 ${note.missCount}</span></div>
+      ${note.img ? `<img src="${note.img}" loading="lazy" decoding="async" style="max-height:80px;border-radius:6px;margin:6px 0;display:block;border:1px solid var(--panel-light);">` : ''}
+      <div class="q">${note.q ? mobEsc(note.q) : '<span style="color:var(--sub);font-style:italic;">(이미지 문제)</span>'}</div>
+      <div class="a">정답: ${mobEsc(note.a)}${note.strict ? ' <span style="color:var(--accent2);font-weight:700;">· 🔀순서유지</span>' : ''}</div>
+      <div class="wrong-actions"><button class="ico-btn edit" title="수정" aria-label="수정">${ICON_EDIT}</button><button class="ico-btn" title="삭제" aria-label="삭제">${ICON_DEL}</button></div>`;
+    const [eb, db] = item.querySelectorAll('.ico-btn');
+    eb.onclick = () => openQuestionEditor(note);
+    db.onclick = async () => { await removeFromWrongNotes(note); flushPendingSaves(); renderWrongList(); };
+    frag.appendChild(item);
   });
+  wrongList.appendChild(frag);
 }
 
 /* =========================================================================
@@ -2237,6 +2272,7 @@ function loadQuestion() {
 
   renderHUD();
   startTimer();
+  setTimeout(() => preloadQuestionImage(state.questions[state.currentIndex + 1]), 80);
 }
 
 /* =========================================================================
@@ -2334,30 +2370,20 @@ if (imageLightboxModal) {
 /* =========================================================================
  * 13. 타이머 로직
  * ========================================================================= */
+let stopDeskTimer = null, deskLv = -1;
+function stopTimer() { if (stopDeskTimer) { stopDeskTimer(); stopDeskTimer = null; } }
 function startTimer() {
-  clearInterval(state.timerId);
-  state.timeLeft = state.timeLimit;
+  stopTimer();
+  state.timeLeft = state.timeLimit; deskLv = -1;
   timeLimitLabel.textContent = `제한 ${state.timeLimit}초`;
   updateTimerBar();
-
-  const tickMs = 100;
-  state.timerId = setInterval(() => {
-    state.timeLeft -= tickMs / 1000;
-    if (state.timeLeft <= 0) {
-      state.timeLeft = 0;
-      updateTimerBar();
-      clearInterval(state.timerId);
-      handleTimeout();
-    } else {
-      updateTimerBar();
-    }
-  }, tickMs);
+  stopDeskTimer = createFrameTimer(state.timeLimit, (l) => { state.timeLeft = l; updateTimerBar(); }, () => { stopDeskTimer = null; handleTimeout(); });
 }
-
 function updateTimerBar() {
-  const ratio = state.timeLeft / state.timeLimit;
-  timerBar.style.width = `${ratio * 100}%`;
-  timerBar.style.backgroundColor = ratio < 0.25 ? 'var(--bad)' : (ratio < 0.5 ? 'var(--warn)' : 'var(--accent)');
+  const ratio = Math.max(0, state.timeLeft / state.timeLimit);
+  timerBar.style.transform = `scaleX(${ratio})`;
+  const lv = ratio < 0.25 ? 2 : (ratio < 0.5 ? 1 : 0);
+  if (lv !== deskLv) { deskLv = lv; timerBar.style.backgroundColor = ['var(--accent)', 'var(--warn)', 'var(--bad)'][lv]; }
 }
 
 /* =========================================================================
@@ -2381,7 +2407,7 @@ function markWrong() {
 function skipQuestion() {
   if (screenGame.classList.contains('hidden')) return;
   if (state.questions.length === 0) return;
-  clearInterval(state.timerId);
+  stopTimer();
   markWrong();
 }
 
@@ -2403,7 +2429,7 @@ answerInput.addEventListener('keydown', (e) => {
 function handleCorrect() {
   if (state.locked) return; // 중복 실행 방지 (markWrong과 동일한 이유)
   state.locked = true;
-  clearInterval(state.timerId);
+  stopTimer();
   answerInput.disabled = true;
   state.score += 1;
 
@@ -2426,7 +2452,8 @@ function handleTimeout() {
 }
 
 function endGame() {
-  clearInterval(state.timerId);
+  stopTimer();
+  flushPendingSaves();
   showScreen(screenResult);
   resultScore.textContent = `${state.score}점`;
   let desc = state.subject;
@@ -2580,7 +2607,7 @@ function renderManageList() {
         qItem.className = 'acc-q-item';
         if (q.img) {
           const imgEl = document.createElement('img');
-          imgEl.className = 'manage-item-img';
+          imgEl.className = 'manage-item-img'; imgEl.loading = 'lazy'; imgEl.decoding = 'async';
           imgEl.src = q.img;
           imgEl.alt = '이미지';
           qItem.appendChild(imgEl);
@@ -3882,15 +3909,20 @@ function mobEsc(s) {
 }
 
 // 키보드가 올라와도 화면이 가려지지 않도록 보이는 영역(visualViewport)에 맞춘다
+let mobVvRaf = 0;
 function mobFitViewport() {
-  if (!mobActive) return;
-  const vv = window.visualViewport;
-  if (vv) {
-    mobileAppEl.style.top = vv.offsetTop + 'px';
-    mobileAppEl.style.height = vv.height + 'px';
-    mobileAppEl.style.bottom = 'auto';
-  }
-  if (window.scrollY) window.scrollTo(0, 0);
+  if (!mobActive || mobVvRaf) return;
+  mobVvRaf = requestAnimationFrame(() => {
+    mobVvRaf = 0;
+    const vv = window.visualViewport;
+    if (vv) {
+      const t = vv.offsetTop + 'px', h = vv.height + 'px';
+      if (mobileAppEl.style.top !== t) mobileAppEl.style.top = t;
+      if (mobileAppEl.style.height !== h) mobileAppEl.style.height = h;
+      mobileAppEl.style.bottom = 'auto';
+    }
+    if (window.scrollY) window.scrollTo(0, 0);
+  });
 }
 function mobResetViewportStyle() {
   mobileAppEl.style.top = '';
@@ -4103,7 +4135,7 @@ function mobStartGame(subject, topics, mode) {
 }
 
 function mobLoadQuestion() {
-  clearInterval(mobGame.timerId);
+  mobStopTimer();
   clearTimeout(mobGame.advanceId);
   if (mobGame.index >= mobGame.questions.length) { mobEndGame(); return; }
 
@@ -4135,38 +4167,33 @@ function mobLoadQuestion() {
   mobInput.classList.remove('wrong', 'ok');
   mobInput.focus(); // 입력창을 비활성화하지 않아 키보드가 계속 유지됨
   mobStartTimer();
+  setTimeout(() => preloadQuestionImage(mobGame.questions[mobGame.index + 1]), 80);
 }
 
+let mobStop = null, mLv = -1, mSec = -1, mUr = null;
+function mobStopTimer() { if (mobStop) { mobStop(); mobStop = null; } }
 function mobStartTimer() {
-  mobGame.timeLeft = mobGame.timeLimit;
+  mobStopTimer();
+  mobGame.timeLeft = mobGame.timeLimit; mLv = mSec = -1; mUr = null;
   mobUpdateTimerBar();
-  mobGame.timerId = setInterval(() => {
-    mobGame.timeLeft -= 0.1;
-    if (mobGame.timeLeft <= 0) {
-      mobGame.timeLeft = 0;
-      mobUpdateTimerBar();
-      clearInterval(mobGame.timerId);
-      mobMarkWrong();
-    } else mobUpdateTimerBar();
-  }, 100);
+  mobStop = createFrameTimer(mobGame.timeLimit, (l) => { mobGame.timeLeft = l; mobUpdateTimerBar(); }, () => { mobStop = null; mobMarkWrong(); });
 }
 function mobUpdateTimerBar() {
   const ratio = Math.max(0, mobGame.timeLeft / mobGame.timeLimit);
-  const color = ratio < 0.25 ? '#f87171' : (ratio < 0.5 ? '#facc15' : '#38bdf8');
-  const bar = $m('m-timerBar');
-  bar.style.width = `${ratio * 100}%`;
-  bar.style.backgroundColor = color;
-  bar.style.color = color;
-  const num = $m('m-timeNum');
-  num.textContent = Math.ceil(mobGame.timeLeft);
-  num.style.color = color;
-  $m('m-gameTop').classList.toggle('urgent', ratio < 0.25 && !mobGame.locked);
+  const bar = $m('m-timerBar'), num = $m('m-timeNum');
+  bar.style.transform = `scaleX(${ratio})`;
+  const lv = ratio < 0.25 ? 2 : (ratio < 0.5 ? 1 : 0);
+  if (lv !== mLv) { mLv = lv; const c = ['#38bdf8', '#facc15', '#f87171'][lv]; bar.style.backgroundColor = c; num.style.color = c; }
+  const sec = Math.ceil(mobGame.timeLeft);
+  if (sec !== mSec) { mSec = sec; num.textContent = sec; }
+  const ur = ratio < 0.25 && !mobGame.locked;
+  if (ur !== mUr) { mUr = ur; $m('m-gameTop').classList.toggle('urgent', ur); }
 }
 
 function mobMarkWrong() {
   if (mobGame.locked) return;
   mobGame.locked = true;
-  clearInterval(mobGame.timerId);
+  mobStopTimer();
   const cur = mobGame.questions[mobGame.index];
   addToWrongNotes(cur).catch(() => {});
   const flash = $m('m-correctFlash');
@@ -4179,7 +4206,7 @@ function mobMarkWrong() {
 function mobHandleCorrect() {
   if (mobGame.locked) return;
   mobGame.locked = true;
-  clearInterval(mobGame.timerId);
+  mobStopTimer();
   mobGame.score += 1;
   $m('m-score').textContent = `${mobGame.score}점`;
   $m('m-gameTop').classList.remove('urgent');
@@ -4204,7 +4231,8 @@ mobInput.addEventListener('keydown', (e) => {
 });
 
 function mobEndGame() {
-  clearInterval(mobGame.timerId);
+  mobStopTimer();
+  flushPendingSaves();
   clearTimeout(mobGame.advanceId);
   mobGame.locked = true;
   mobInput.blur();
@@ -4250,16 +4278,18 @@ function mobRenderWrong() {
       </div>`;
     if (note.img) {
       const th = document.createElement('img');
-      th.className = 'm-wrong-img';
+      th.className = 'm-wrong-img'; th.loading = 'lazy'; th.decoding = 'async';
       th.src = note.img;
       th.addEventListener('click', () => mobOpenLightbox(note.img));
       item.appendChild(th);
     }
-    const del = document.createElement('button');
-    del.className = 'm-wrong-del';
-    del.textContent = '✕';
-    del.addEventListener('click', async () => { await removeFromWrongNotes(note); mobRenderWrong(); });
-    item.appendChild(del);
+    const acts = document.createElement('div');
+    acts.className = 'm-wrong-actions';
+    acts.innerHTML = `<button class="ico-btn edit" aria-label="수정">${ICON_EDIT}</button><button class="ico-btn" aria-label="삭제">${ICON_DEL}</button>`;
+    const [eb, db] = acts.querySelectorAll('.ico-btn');
+    eb.addEventListener('click', () => openQuestionEditor(note));
+    db.addEventListener('click', async () => { await removeFromWrongNotes(note); flushPendingSaves(); mobRenderWrong(); });
+    item.appendChild(acts);
     list.appendChild(item);
   });
 }
@@ -4437,7 +4467,7 @@ function mobApplyMode() {
     mobRenderHome();
     mobShow('m-home');
   } else {
-    clearInterval(mobGame.timerId);
+    mobStopTimer();
     clearTimeout(mobGame.advanceId);
     mobCloseLightbox();
     mobResetViewportStyle();
@@ -4464,6 +4494,81 @@ function mobInit() {
     mobApplyMode();
   });
 }
+
+/* =========================================================================
+ * 16-2. 오답노트 문제 바로 수정 (PC/모바일 공용)
+ * ========================================================================= */
+const $q = (id) => document.getElementById(id);
+let qeNote = null, qeImg = null, qeBusy = false;
+function qeImgUI() {
+  $q('qeImgBox').classList.toggle('hidden', !qeImg); $q('qeRm').classList.toggle('hidden', !qeImg);
+  if (qeImg) $q('qeImg').src = qeImg;
+}
+function qeFit() {
+  const m = $q('qe'), v = window.visualViewport;
+  if (!v || m.classList.contains('hidden')) return;
+  m.style.top = v.offsetTop + 'px'; m.style.height = v.height + 'px'; m.style.bottom = 'auto';
+}
+if (window.visualViewport) { visualViewport.addEventListener('resize', qeFit); visualViewport.addEventListener('scroll', qeFit); }
+function qeClose() { const m = $q('qe'); m.classList.add('hidden'); m.style.cssText = ''; document.body.style.overflow = ''; qeNote = null; }
+function openQuestionEditor(note) {
+  qeNote = note; qeImg = note.img || null;
+  $q('qeS').value = note.subject || ''; $q('qeT').value = note.topic || '';
+  $q('qeQ').value = note.q || ''; $q('qeA').value = note.a || ''; $q('qeK').checked = !!note.strict;
+  qeImgUI(); $q('qe').classList.remove('hidden'); document.body.style.overflow = 'hidden'; qeFit();
+}
+function qeFind(n) {
+  for (const sb in CUSTOM_DATA) for (const t in CUSTOM_DATA[sb]) {
+    const i = CUSTOM_DATA[sb][t].findIndex(x => n.id ? x.id === n.id : (sb === n.subject && t === n.topic && x.q === n.q && x.a === n.a));
+    if (i >= 0) return { sb, t, i };
+  }
+  return null;
+}
+async function qeSave() {
+  if (qeBusy || !qeNote) return;
+  const subject = $q('qeS').value.trim(), topic = $q('qeT').value.trim(), q = $q('qeQ').value.trim(), a = $q('qeA').value.trim();
+  const strict = $q('qeK').checked, img = qeImg;
+  if (!subject || !topic || !a) { alert('과목, 주제, 정답을 입력해주세요.'); return; }
+  if (!q && !img) { alert('질문 또는 사진을 등록해주세요.'); return; }
+  qeBusy = true;
+  try {
+    const note = qeNote, loc = qeFind(note);
+    const old = loc ? CUSTOM_DATA[loc.sb][loc.t][loc.i] : null;
+    const id = note.id || (old && old.id) || genId();
+    if (old) {
+      const e = { id, q, a }; if (img) e.img = img; if (strict) e.strict = true;
+      if (loc.sb === subject && loc.t === topic) CUSTOM_DATA[subject][topic][loc.i] = e;
+      else {
+        const arr = CUSTOM_DATA[loc.sb][loc.t]; arr.splice(loc.i, 1);
+        if (!arr.length) delete CUSTOM_DATA[loc.sb][loc.t];
+        if (!Object.keys(CUSTOM_DATA[loc.sb]).length) delete CUSTOM_DATA[loc.sb];
+        ((CUSTOM_DATA[subject] = CUSTOM_DATA[subject] || {})[topic] = CUSTOM_DATA[subject][topic] || []).push(e);
+      }
+      await saveCustomData();
+    }
+    Object.assign(note, { id, subject, topic, q, a });
+    if (img) note.img = img; else delete note.img;
+    if (strict) note.strict = true; else delete note.strict;
+    await saveWrongNotes();
+    qeClose();
+    renderWrongBadge(); renderManageList(); renderDatalists(); renderSubjectGrid();
+    if (mobActive) mobRenderWrong(); else renderWrongList();
+    mobToast(old ? '수정했어요' : '오답노트의 문제만 수정했어요 (원본 목록에는 없는 문제)');
+  } finally { qeBusy = false; }
+}
+$q('qeOk').addEventListener('click', qeSave);
+$q('qeX').addEventListener('click', qeClose);
+$q('qeRm').addEventListener('click', () => { qeImg = null; qeImgUI(); });
+$q('qeF').addEventListener('change', async (e) => {
+  const c = e.target.files[0] && await compressImage(e.target.files[0]);
+  if (c) { qeImg = c; qeImgUI(); }
+  e.target.value = '';
+});
+$q('qe').addEventListener('mousedown', (e) => { if (e.target === $q('qe')) qeClose(); });
+$q('qeA').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); qeSave(); } });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$q('qe').classList.contains('hidden')) { e.preventDefault(); e.stopPropagation(); qeClose(); }
+}, true);
 
 /* =========================================================================
  * 17. 초기화
