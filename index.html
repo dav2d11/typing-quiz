@@ -525,44 +525,81 @@
   }
   .m-btn-ghost:active { background: #1e293b; }
 
-  /* ─── 게임 화면 ─── */
-  #m-game { background: #0a0f1c; }
+  /* ─── 게임 화면 (미니멀) ─── */
+  #m-game { background: #0a0f1c; position: relative; }
   .m-game-top {
-    flex-shrink: 0; background: #1e293b;
-    padding: 6px 12px 4px;
-    padding-top: max(6px, env(safe-area-inset-top));
+    flex-shrink: 0; background: #0f172a;
+    padding-top: max(2px, env(safe-area-inset-top));
   }
   .m-game-hud {
-    display: flex; justify-content: space-between;
-    font-size: 13px; font-weight: 600; color: #94a3b8; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+    height: 40px; padding: 0 4px 0 2px;
+    font-size: 14px; font-weight: 700; color: #94a3b8;
+    font-variant-numeric: tabular-nums;
   }
-  .m-timer-outer { height: 4px; background: #334155; border-radius: 99px; overflow: hidden; }
+  .m-hud-spacer { flex: 1; }
+  .m-ico-btn {
+    width: 40px; height: 40px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; color: #94a3b8; padding: 0; cursor: pointer;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  .m-ico-btn:active { color: #e2e8f0; transform: scale(.88); }
+  .m-ico-btn svg {
+    width: 22px; height: 22px; fill: none; stroke: currentColor;
+    stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .m-strict-badge { display: inline-flex; color: #a78bfa; }
+  .m-strict-badge svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  #m-timeNum {
+    min-width: 34px; text-align: right; font-size: 22px; font-weight: 900;
+    color: #38bdf8; transition: color .2s; padding-right: 8px;
+  }
+  .m-timer-outer { height: 10px; background: #1e293b; overflow: hidden; }
   .m-timer-inner {
     height: 100%; background: #38bdf8; width: 100%;
-    transition: width .1s linear;
+    transition: width .1s linear, background-color .3s;
+    box-shadow: 0 0 10px currentColor;
   }
+  .m-game-top.urgent #m-timeNum { color: #f87171; animation: mPulse .5s ease-in-out infinite alternate; }
+  .m-game-top.urgent .m-timer-inner { animation: mBlink .5s ease-in-out infinite alternate; }
+  @keyframes mPulse { from { transform: scale(1); } to { transform: scale(1.25); } }
+  @keyframes mBlink { from { opacity: 1; } to { opacity: .55; } }
+
   .m-game-img-area {
     flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center;
-    padding: 6px 6px 0;
-    min-height: 0;
+    padding: 2px; min-height: 0;
   }
   .m-game-img-area img {
-    max-width: 100%; max-height: 100%; object-fit: contain;
-    border-radius: 10px; border: 1px solid #334155;
-    cursor: zoom-in;
-    display: block;
+    width: 100%; height: 100%; object-fit: contain;
+    border-radius: 6px; cursor: zoom-in; display: block;
   }
   .m-game-q-text {
-    flex-shrink: 0; font-size: 17px; font-weight: 600; line-height: 1.5;
-    color: #e2e8f0; text-align: center; padding: 8px 12px 0;
+    flex-shrink: 0; font-size: 15px; font-weight: 600; line-height: 1.4;
+    color: #e2e8f0; text-align: center; padding: 4px 12px;
+  }
+  .m-game-q-text.big {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; line-height: 1.5; padding: 12px 20px; overflow-y: auto;
   }
   .m-game-q-text.hidden { display: none; }
-  .m-correct-flash { display: none; text-align: center; font-size: 32px; padding: 8px; color: #4ade80; font-weight: 900; }
+  /* 오답/시간초과 시에만 정답을 아래쪽에 잠깐 표시 */
+  .m-correct-flash {
+    display: none; position: absolute; left: 12px; right: 12px;
+    bottom: calc(60px + env(safe-area-inset-bottom)); z-index: 5;
+    text-align: center; font-size: 16px; font-weight: 800; padding: 8px 12px;
+    color: #f87171; background: rgba(15,23,42,.94); border: 1px solid #f87171; border-radius: 10px;
+  }
   .m-correct-flash.show { display: block; }
   .m-game-bottom {
     flex-shrink: 0; padding: 8px 12px;
     padding-bottom: max(8px, env(safe-area-inset-bottom));
     background: #1e293b; border-top: 1px solid #334155;
+  }
+  #m-game .m-game-bottom {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 4px 4px 10px; padding-bottom: max(4px, env(safe-area-inset-bottom));
+    background: #0f172a; border-top: 1px solid #1e293b;
   }
   .m-answer-input {
     width: 100%; padding: 14px 16px; font-size: 18px; border-radius: 12px;
@@ -573,10 +610,13 @@
   }
   .m-answer-input:focus { border-color: #38bdf8; }
   .m-answer-input.wrong { border-color: #f87171; }
-  .m-strict-hint { font-size: 11px; color: #a78bfa; text-align: center; padding: 3px 0; }
+  .m-answer-input.ok { border-color: #4ade80; }
+  .m-answer-input.m-slim {
+    flex: 1; width: auto; min-width: 0; height: 38px; padding: 0 12px;
+    font-size: 16px; border-width: 0 0 2px 0; border-radius: 0; background: transparent; text-align: left;
+  }
   .m-game-btns { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
   .m-game-btns .m-btn-ghost { flex: 1; font-size: 13px; padding: 9px; }
-  .m-game-hint { font-size: 11px; color: #475569; text-align: right; flex: 0; white-space: nowrap; }
 
   /* ─── 결과 화면 ─── */
   #m-result { align-items: center; justify-content: center; gap: 12px; padding: 24px; }
@@ -661,7 +701,6 @@
     width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; cursor: pointer;
     touch-action: manipulation; font-size: 13px;
   }
-  .m-correct-flash.bad { color: #f87171; font-size: 20px; }
 
   /* 암기 모드 */
   .m-mem-dots { display: flex; justify-content: center; gap: 8px; padding: 10px 0 4px; flex-shrink: 0; }
@@ -1035,10 +1074,14 @@
 
   <!-- ── M-게임 화면 ── -->
   <div class="m-screen" id="m-game">
-    <div class="m-game-top">
+    <div class="m-game-top" id="m-gameTop">
       <div class="m-game-hud">
-        <span id="m-progress">문제 0/0</span>
-        <span id="m-score">점수 0</span>
+        <button class="m-ico-btn" id="m-btn-quit" aria-label="종료"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <span id="m-progress">0/0</span>
+        <span class="m-strict-badge hidden" id="m-strictHint" title="순서 맞춤"><svg viewBox="0 0 24 24"><path d="M3 7h4c3 0 5 10 8 10h5M3 17h4c1.5 0 2.7-2.5 3.7-5M13.3 9C14 8 14.7 7 16 7h4M17 4l3 3-3 3M17 14l3 3-3 3"/></svg></span>
+        <span class="m-hud-spacer"></span>
+        <span id="m-score">0점</span>
+        <span id="m-timeNum">0</span>
       </div>
       <div class="m-timer-outer"><div class="m-timer-inner" id="m-timerBar"></div></div>
     </div>
@@ -1046,15 +1089,10 @@
       <img id="m-questionImg" src="" alt="" style="display:none;">
     </div>
     <div class="m-game-q-text hidden" id="m-questionText"></div>
-    <div class="m-correct-flash" id="m-correctFlash">💥 격파!</div>
+    <div class="m-correct-flash" id="m-correctFlash"></div>
     <div class="m-game-bottom">
-      <div class="m-strict-hint hidden" id="m-strictHint">🔀 순서 정확히</div>
-      <input type="text" id="m-answerInput" class="m-answer-input" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
-      <div class="m-game-btns">
-        <button class="m-btn-ghost" id="m-btn-quit">종료</button>
-        <button class="m-btn-ghost" id="m-btn-skip">넘기기</button>
-        <span class="m-game-hint" id="m-hint"></span>
-      </div>
+      <input type="text" id="m-answerInput" class="m-answer-input m-slim" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+      <button class="m-ico-btn" id="m-btn-skip" aria-label="넘기기"><svg viewBox="0 0 24 24"><path d="M5 12h13M12.5 5.5L19 12l-6.5 6.5"/></svg></button>
     </div>
   </div>
 
@@ -4073,12 +4111,13 @@ function mobLoadQuestion() {
   mobGame.locked = false;
   mobGame.timeLimit = computeTimeLimit(cur);
 
-  $m('m-progress').textContent = `문제 ${mobGame.index + 1}/${mobGame.questions.length}`;
-  $m('m-score').textContent = `점수 ${mobGame.score}`;
+  $m('m-progress').textContent = `${mobGame.index + 1}/${mobGame.questions.length}`;
+  $m('m-score').textContent = `${mobGame.score}점`;
 
   const qText = $m('m-questionText');
   qText.textContent = cur.q || '';
   qText.classList.toggle('hidden', !cur.q);
+  qText.classList.toggle('big', !cur.img); // 사진이 없으면 문제 글자를 크게
 
   const img = $m('m-questionImg');
   const imgArea = $m('m-imgArea');
@@ -4089,13 +4128,11 @@ function mobLoadQuestion() {
   }
 
   $m('m-strictHint').classList.toggle('hidden', !cur.strict);
-  $m('m-correctFlash').classList.remove('show', 'bad');
-  $m('m-hint').textContent = Array.isArray(mobGame.topic) && mobGame.topic.length
-    ? (mobGame.topic.length === 1 ? mobGame.topic[0] : `${mobGame.topic[0]} 외 ${mobGame.topic.length - 1}`)
-    : (mobGame.mode === 'wrongReview' ? '오답노트' : '');
+  $m('m-correctFlash').classList.remove('show');
+  $m('m-gameTop').classList.remove('urgent');
 
   mobInput.value = '';
-  mobInput.classList.remove('wrong');
+  mobInput.classList.remove('wrong', 'ok');
   mobInput.focus(); // 입력창을 비활성화하지 않아 키보드가 계속 유지됨
   mobStartTimer();
 }
@@ -4114,10 +4151,16 @@ function mobStartTimer() {
   }, 100);
 }
 function mobUpdateTimerBar() {
-  const ratio = mobGame.timeLeft / mobGame.timeLimit;
+  const ratio = Math.max(0, mobGame.timeLeft / mobGame.timeLimit);
+  const color = ratio < 0.25 ? '#f87171' : (ratio < 0.5 ? '#facc15' : '#38bdf8');
   const bar = $m('m-timerBar');
   bar.style.width = `${ratio * 100}%`;
-  bar.style.background = ratio < 0.25 ? '#f87171' : (ratio < 0.5 ? '#facc15' : '#38bdf8');
+  bar.style.backgroundColor = color;
+  bar.style.color = color;
+  const num = $m('m-timeNum');
+  num.textContent = Math.ceil(mobGame.timeLeft);
+  num.style.color = color;
+  $m('m-gameTop').classList.toggle('urgent', ratio < 0.25 && !mobGame.locked);
 }
 
 function mobMarkWrong() {
@@ -4127,8 +4170,9 @@ function mobMarkWrong() {
   const cur = mobGame.questions[mobGame.index];
   addToWrongNotes(cur).catch(() => {});
   const flash = $m('m-correctFlash');
-  flash.textContent = `❌ 정답: ${getKeywords(cur)[0] || cur.a}`;
-  flash.classList.add('show', 'bad');
+  flash.textContent = `정답  ${getKeywords(cur)[0] || cur.a}`;
+  flash.classList.add('show');
+  $m('m-gameTop').classList.remove('urgent');
   mobGame.advanceId = setTimeout(() => { mobGame.index += 1; mobLoadQuestion(); }, 1100);
 }
 
@@ -4137,13 +4181,11 @@ function mobHandleCorrect() {
   mobGame.locked = true;
   clearInterval(mobGame.timerId);
   mobGame.score += 1;
-  $m('m-score').textContent = `점수 ${mobGame.score}`;
-  const flash = $m('m-correctFlash');
-  flash.textContent = '💥 격파!';
-  flash.classList.remove('bad');
-  flash.classList.add('show');
+  $m('m-score').textContent = `${mobGame.score}점`;
+  $m('m-gameTop').classList.remove('urgent');
+  mobInput.classList.add('ok'); // 입력줄이 잠깐 초록색으로 바뀐 뒤 바로 다음 문제
   removeFromWrongNotes(mobGame.questions[mobGame.index]);
-  mobGame.advanceId = setTimeout(() => { mobGame.index += 1; mobLoadQuestion(); }, 450);
+  mobGame.advanceId = setTimeout(() => { mobGame.index += 1; mobLoadQuestion(); }, 160);
 }
 
 mobInput.addEventListener('input', () => {
@@ -4170,7 +4212,7 @@ function mobEndGame() {
   $m('m-resultScore').textContent = `${mobGame.score}점`;
   let desc = mobGame.subject || '';
   if (mobGame.mode !== 'wrongReview' && Array.isArray(mobGame.topic) && mobGame.topic.length) desc += ` (${mobGame.topic.join(', ')})`;
-  $m('m-resultDesc').textContent = `${desc} · ${total}문제 중 ${mobGame.score}문제 격파`;
+  $m('m-resultDesc').textContent = `${desc} · ${total}문제 중 ${mobGame.score}문제 정답`;
   mobShow('m-result');
 }
 
