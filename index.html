@@ -1,0 +1,3388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<title>타자 격파 퀴즈</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --panel:#1e293b;
+    --panel-light:#334155;
+    --accent:#38bdf8;
+    --accent2:#a78bfa;
+    --good:#4ade80;
+    --bad:#f87171;
+    --warn:#facc15;
+    --text:#e2e8f0;
+    --sub:#94a3b8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;
+    font-family:"Pretendard",-apple-system,BlinkMacSystemFont,"Malgun Gothic",sans-serif;
+    background:radial-gradient(circle at top, #1e293b, #0f172a 70%);
+    color:var(--text);
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    padding-top:max(24px, env(safe-area-inset-top));
+    padding-bottom:max(24px, env(safe-area-inset-bottom));
+    padding-left:max(16px, env(safe-area-inset-left));
+    padding-right:max(16px, env(safe-area-inset-right));
+  }
+  .app{ width:100%; max-width:960px; transition:max-width .15s ease; }
+  .app.wide{ max-width:1180px; }
+  h1{ text-align:center; font-size:28px; margin-bottom:4px; letter-spacing:2px; }
+  .subtitle{ text-align:center; color:var(--sub); margin-bottom:20px; font-size:14px; }
+  .panel{ background:var(--panel); border:1px solid var(--panel-light); border-radius:16px; padding:24px; }
+
+  /* 상단 액션 버튼 (문제 만들기 / 오답노트) */
+  .top-actions{ display:flex; gap:8px; margin-bottom:16px; }
+  .top-actions button{
+    flex:1; position:relative;
+    background:var(--panel-light); border:1px solid transparent; color:var(--text);
+    padding:10px; border-radius:10px; cursor:pointer; font-size:13px;
+  }
+  .top-actions button:hover{ border-color:var(--accent); }
+  .badge{
+    position:absolute; top:-6px; right:-6px;
+    background:var(--bad); color:#fff; font-size:11px; font-weight:700;
+    min-width:18px; height:18px; border-radius:999px;
+    display:flex; align-items:center; justify-content:center; padding:0 4px;
+  }
+  .badge.hidden{ display:none; }
+
+  /* 과목/주제 선택 */
+  .subject-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  .card-btn{
+    background:var(--panel-light); border:1px solid transparent; color:var(--text);
+    border-radius:12px; padding:16px; font-size:15px; cursor:pointer; transition:all .15s ease; text-align:left;
+  }
+  .card-btn:hover{ border-color:var(--accent); transform:translateY(-2px); }
+  .card-btn.active{ border-color:var(--accent2); background:#3b3060; }
+  .topic-section{ margin-top:8px; border-top:1px dashed var(--panel-light); padding-top:16px; }
+  .topic-section h3{ margin:0 0 10px; font-size:14px; color:var(--sub); }
+  .topic-list{ display:flex; flex-wrap:wrap; gap:8px; }
+  .topic-chip{
+    background:#0f172a; border:1px solid var(--panel-light); color:var(--text);
+    padding:8px 14px; border-radius:999px; font-size:13px; cursor:pointer;
+    transition:all .15s ease; user-select:none; display:inline-flex; align-items:center; gap:6px;
+  }
+  .topic-chip:hover{ border-color:var(--accent); }
+  .topic-chip.selected{
+    background:#3b3060; border-color:var(--accent2); color:#fff; font-weight:700;
+  }
+  .topic-chip .check-icon{ font-size:11px; opacity:0; width:0; overflow:hidden; transition:all .15s ease; }
+  .topic-chip.selected .check-icon{ opacity:1; width:auto; }
+  .topic-control-bar{
+    display:flex; gap:8px; align-items:center; margin-top:14px; padding-top:14px; border-top:1px dashed var(--panel-light);
+  }
+  .topic-control-bar .primary-btn{ flex:1; }
+  .empty-msg{ color:var(--sub); font-size:13px; text-align:center; padding:20px 0; }
+
+  /* 게임 화면 */
+  .hud{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:14px; color:var(--sub); }
+  .timer-info{ display:flex; justify-content:space-between; font-size:11px; color:var(--sub); margin-bottom:4px; }
+  .timer-bar-outer{ height:8px; background:#0f172a; border-radius:999px; overflow:hidden; margin-bottom:20px; }
+  .timer-bar-inner{ height:100%; background:var(--accent); width:100%; transition:width .1s linear, background-color .3s; }
+  .target-zone{ position:relative; text-align:center; padding:36px 12px; min-height:160px; display:flex; align-items:center; justify-content:center; }
+  .question-text{ font-size:22px; font-weight:600; line-height:1.5; }
+  .answer-input{
+    width:100%; margin-top:20px; padding:14px 16px; font-size:18px; border-radius:10px;
+    border:2px solid var(--panel-light); background:#0f172a; color:var(--text); text-align:center; outline:none;
+  }
+  .answer-input.wrong{ border-color:var(--bad); animation:shake .25s; }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
+  .clear-effect{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:44px; font-weight:900; color:var(--good); opacity:0; pointer-events:none;
+  }
+  .clear-effect.play{ animation:burst .5s ease-out forwards; }
+  @keyframes burst{
+    0%{opacity:0; transform:scale(.4) rotate(-8deg);}
+    30%{opacity:1; transform:scale(1.25) rotate(4deg);}
+    60%{opacity:1; transform:scale(1) rotate(0deg);}
+    100%{opacity:0; transform:scale(1.4) rotate(0deg);}
+  }
+  .fail-flash{ animation:flashRed .4s ease; }
+  @keyframes flashRed{ 0%{background:rgba(248,113,113,.25);} 100%{background:transparent;} }
+  .footer-row{ display:flex; justify-content:space-between; margin-top:16px; }
+  .ghost-btn{
+    background:transparent; border:1px solid var(--panel-light); color:var(--sub);
+    padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;
+  }
+  .ghost-btn:hover{ color:var(--text); border-color:var(--accent); }
+
+  /* 결과 화면 */
+  .result-score{ font-size:40px; text-align:center; color:var(--accent); margin:12px 0; }
+  .result-desc{ text-align:center; color:var(--sub); margin-bottom:20px; }
+  .primary-btn{
+    width:100%; padding:14px; border:none; border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#0f172a; font-weight:700; font-size:15px; cursor:pointer;
+    touch-action:manipulation; user-select:none; -webkit-user-select:none;
+    transition:transform .08s ease, filter .08s ease;
+  }
+  .primary-btn:active{ transform:scale(0.98); filter:brightness(0.92); }
+  .primary-btn:disabled{ opacity:.4; cursor:not-allowed; }
+
+  /* 문제 만들기 화면 */
+  .form-group{ margin-bottom:14px; }
+  .form-group label{ display:block; font-size:12px; color:var(--sub); margin-bottom:6px; }
+  .form-group input, .form-group textarea{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--panel-light);
+    background:#0f172a; color:var(--text); font-size:14px; outline:none; font-family:inherit;
+  }
+  .form-group textarea{ resize:vertical; min-height:56px; }
+  .form-group input:focus, .form-group textarea:focus{ border-color:var(--accent); }
+  .form-hint{ font-size:11px; color:var(--sub); margin-top:4px; }
+  .form-row{ display:flex; gap:10px; }
+  .form-row .form-group{ flex:1; }
+
+  /* 게임 화면 - 문제 이미지 (가로로 긴 이미지: 인라인으로 크게 표시) */
+  .question-img-wrap{ width:100%; display:flex; justify-content:center; margin-bottom:10px; }
+  .question-img-wrap img{ max-width:100%; max-height:440px; border-radius:10px; object-fit:contain; border:1px solid var(--panel-light); }
+
+  /* 게임 화면 2분할 레이아웃 (세로로 긴 이미지: 옆쪽 패널에 크게 표시) */
+  .game-body{ display:flex; gap:20px; align-items:flex-start; }
+  .game-main{ flex:1; min-width:0; }
+  .game-side-image{
+    flex:0 0 380px; display:flex; justify-content:center; align-items:flex-start;
+    position:sticky; top:16px; background:var(--panel-light); border-radius:14px; padding:10px;
+  }
+  .game-side-image img{ max-width:100%; max-height:78vh; border-radius:10px; object-fit:contain; display:block; }
+  @media (max-width: 760px){
+    .app.wide{ max-width:960px; }
+    .game-body{ flex-direction:column; }
+    .game-side-image{ flex:0 0 auto; width:100%; position:static; order:-1; }
+    .game-side-image img{ max-height:46vh; }
+  }
+
+  /* 2분할 문제 만들기 레이아웃 */
+  .manage-layout{ display:flex; gap:18px; align-items:flex-start; }
+  .manage-left{ flex:0 0 320px; min-width:0; }
+  .manage-right{ flex:1; min-width:0; max-height:calc(100vh - 160px); overflow-y:auto; padding-right:4px; }
+  .manage-right-title{ font-size:12px; color:var(--sub); font-weight:600; margin-bottom:10px; letter-spacing:.5px; }
+
+  /* 아코디언 - 과목 */
+  .acc-subject{ margin-bottom:8px; }
+  .acc-subject-header{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel-light); border-radius:10px; padding:10px 14px;
+    cursor:pointer; font-size:13px; font-weight:700; color:var(--accent2);
+    user-select:none; transition:background .15s;
+  }
+  .acc-subject-header:hover{ background:#3b3060; }
+  .acc-subject-body{ padding:6px 0 0 0; }
+
+  /* 아코디언 - 폴더 (드래그 지원) */
+  .acc-folder{ margin-bottom:6px; padding-left:6px; border-radius:8px; transition:all .15s ease; position:relative; }
+  .acc-folder.dragging-folder{ opacity:0.35; }
+  .acc-folder.drag-over{ outline:2px dashed var(--accent); background:rgba(56,189,248,.08); }
+  .acc-folder.drag-folder-above{ border-top:2px solid var(--accent); }
+  .acc-folder.drag-folder-below{ border-bottom:2px solid var(--accent); }
+  .acc-folder-header{
+    display:flex; justify-content:space-between; align-items:center;
+    background:#162032; border:1px solid #334155; border-radius:8px;
+    padding:8px 12px; cursor:grab; font-size:12px; font-weight:700; color:var(--accent);
+    user-select:none; transition:background .15s;
+  }
+  .acc-folder-header:active{ cursor:grabbing; }
+  .acc-folder-header:hover{ background:#233047; }
+  .acc-folder-body{ padding:4px 0 0 4px; min-height:10px; }
+
+  /* 아코디언 - 주제 (드래그 지원) */
+  .acc-topic{ margin-bottom:6px; padding-left:6px; transition:opacity .15s; }
+  .acc-topic.dragging{ opacity:0.35; }
+  .acc-topic-header{
+    display:flex; justify-content:space-between; align-items:center;
+    background:#0f172a; border:1px solid var(--panel-light); border-radius:8px;
+    padding:7px 12px; cursor:grab; font-size:12px; color:var(--sub);
+    user-select:none; transition:border-color .15s, color .15s;
+  }
+  .acc-topic-header:active{ cursor:grabbing; }
+  .acc-topic-header:hover{ border-color:var(--accent); color:var(--text); }
+  .acc-topic-body{ padding:4px 0 0 0; }
+  .drag-handle{ color:var(--sub); margin-right:5px; font-size:11px; user-select:none; opacity:.7; }
+
+  /* 미분류 주제 드롭 영역 */
+  .acc-uncat-area{ border-radius:8px; min-height:10px; transition:all .15s ease; }
+  .acc-uncat-area.drag-over{ outline:2px dashed var(--accent2); background:rgba(167,139,250,.08); }
+
+  /* 아코디언 - 문제 아이템 */
+  .acc-q-item{
+    display:flex; align-items:center; gap:8px;
+    background:#0f172a; border:1px solid var(--panel-light); border-radius:8px;
+    padding:8px 10px; margin:4px 0 4px 6px;
+  }
+  .acc-q-text-wrap{ flex:1; min-width:0; }
+  .acc-q-text{ font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .acc-q-ans{ font-size:11px; color:var(--good); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .manage-item-img{ max-width:52px; max-height:38px; border-radius:5px; object-fit:cover; flex-shrink:0; border:1px solid var(--panel-light); }
+  .manage-item-actions{ display:flex; gap:5px; flex-shrink:0; align-items:center; }
+
+  /* 액션 버튼 중앙 정렬 (이모티콘 정중앙 완벽 정렬) */
+  .del-btn, .edit-btn, .order-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:28px; height:28px; border-radius:7px; cursor:pointer; flex-shrink:0;
+    padding:0; margin:0; line-height:1; text-align:center; box-sizing:border-box;
+    font-size:13px; font-family:system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .del-btn{ background:transparent; border:1px solid var(--bad); color:var(--bad); }
+  .del-btn:hover{ background:rgba(248,113,113,.15); }
+  .edit-btn{ background:transparent; border:1px solid var(--accent); color:var(--accent); }
+  .edit-btn:hover{ background:rgba(56,189,248,.15); }
+  .order-btn{ background:transparent; border:1px solid var(--panel-light); color:var(--sub); transition:all .15s ease; }
+  .order-btn:hover{ border-color:var(--accent2); color:var(--text); }
+  .order-btn.active{ background:#3b3060; border-color:var(--accent2); color:#fff; }
+  #btnToggleStrict{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:0; margin:0; line-height:1; text-align:center; box-sizing:border-box;
+  }
+
+  /* 선택 화면 폴더 그룹 */
+  .topic-folder-group{
+    width:100%; margin-top:10px; background:#162032; border:1px solid var(--panel-light);
+    border-radius:10px; padding:10px 12px;
+  }
+  .topic-folder-header{
+    display:flex; justify-content:space-between; align-items:center;
+    cursor:pointer; user-select:none; font-size:13px; font-weight:700; color:var(--accent);
+    margin-bottom:8px;
+  }
+  .topic-folder-header:hover{ color:#fff; }
+  .topic-folder-body{ display:flex; flex-wrap:wrap; gap:8px; }
+
+  /* 게임 화면 - "순서대로 입력하세요" 힌트 */
+  .strict-hint{
+    font-size:12px; color:var(--accent2); font-weight:700; margin-top:8px;
+    display:flex; align-items:center; justify-content:center; gap:4px;
+  }
+
+  /* 이미지 붙여넣기 미리보기 (질문 입력창 아래) */
+  .img-paste-preview{ margin-top:6px; position:relative; display:inline-block; width:100%; }
+  .img-paste-preview img{ max-width:100%; max-height:160px; border-radius:8px; border:1px solid var(--panel-light); display:block; }
+  .img-paste-remove{
+    position:absolute; top:5px; right:5px; background:rgba(15,23,42,.88);
+    border:1px solid var(--bad); color:var(--bad); border-radius:6px;
+    width:24px; height:24px; cursor:pointer; font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .img-paste-remove:hover{ background:rgba(248,113,113,.2); }
+  /* 드래그 오버 시 textarea 하이라이트 */
+  #newQuestion.drag-over{ border-color:var(--accent) !important; background:rgba(56,189,248,.05); }
+
+  /* 오답노트 화면 */
+  .wrong-item{
+    background:#0f172a; border:1px solid var(--panel-light); border-radius:10px; padding:12px; margin-bottom:8px;
+  }
+  .wrong-item .meta{ font-size:11px; color:var(--accent2); display:flex; justify-content:space-between; }
+  .wrong-item .q{ font-size:14px; margin:6px 0 4px; }
+  .wrong-item .a{ font-size:13px; color:var(--good); }
+  .wrong-item .miss-count{ color:var(--warn); }
+
+  /* 암기 모드 화면 */
+  .mem-stage-dots{ display:flex; justify-content:center; gap:8px; margin-bottom:14px; }
+  .mem-stage-dots span{
+    width:26px; height:26px; border-radius:999px; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; background:var(--panel-light); color:var(--sub);
+  }
+  .mem-stage-dots span.active{ background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#0f172a; }
+  .mem-stage-dots span.done{ background:var(--good); color:#0f172a; }
+  .mem-answer-area{ margin-top:22px; min-height:40px; font-size:22px; text-align:center; }
+  .mem-answer-area .full{ color:var(--good); font-weight:700; }
+  .mem-answer-area .choseong{ color:var(--accent2); font-weight:700; letter-spacing:6px; }
+  .mem-answer-area .reveal{ color:var(--good); font-size:15px; margin-top:10px; }
+  .mem-btn-row{ display:flex; gap:8px; margin-top:16px; }
+  .mem-btn-row .primary-btn{ flex:2; }
+  .mem-btn-row .ghost-btn{ flex:1; }
+
+  .info-note{ font-size:11px; color:var(--warn); text-align:center; margin-top:10px; }
+  .backup-row{ display:flex; gap:8px; margin-top:10px; }
+  .backup-row button{ flex:1; }
+  .hidden{ display:none !important; }
+
+  /* ============ 마인드맵 ============ */
+  #screen-mindmap-list, #screen-mindmap-edit, #screen-mindmap-study { position:relative; }
+
+  /* 마인드맵 목록 카드 */
+  .mm-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+  .mm-card{
+    background:var(--panel-light); border:1px solid transparent; border-radius:12px;
+    padding:16px; cursor:pointer; transition:all .15s ease; text-align:left;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .mm-card:hover{ border-color:var(--accent); transform:translateY(-2px); }
+  .mm-card-title{ font-size:15px; font-weight:700; color:var(--text); }
+  .mm-card-meta{ font-size:11px; color:var(--sub); }
+  .mm-card-actions{ display:flex; gap:6px; margin-top:6px; }
+
+  /* 에디터 레이아웃 */
+  .mm-editor-wrap{
+    display:grid; grid-template-columns:1fr 280px; gap:12px; height:calc(100vh - 200px); min-height:500px;
+  }
+  .mm-canvas-wrap{
+    background:#0a0f1c; border:1px solid var(--panel-light); border-radius:12px;
+    overflow:hidden; position:relative; cursor:grab;
+  }
+  .mm-canvas-wrap:active{ cursor:grabbing; }
+  #mmSvg{ width:100%; height:100%; }
+  .mm-node{ cursor:pointer; }
+  .mm-node rect, .mm-node ellipse{
+    transition:filter .15s, stroke .15s;
+  }
+  .mm-node:hover rect, .mm-node:hover ellipse{ filter:brightness(1.25); }
+  .mm-node.selected rect, .mm-node.selected ellipse{
+    stroke:#fff !important; stroke-width:2.5 !important;
+  }
+  .mm-node text{ pointer-events:none; font-family:"Pretendard","Malgun Gothic",sans-serif; }
+  .mm-edge{ fill:none; stroke-linecap:round; }
+
+  /* 에디터 사이드 패널 */
+  .mm-side{
+    background:#0a0f1c; border:1px solid var(--panel-light); border-radius:12px;
+    padding:14px; display:flex; flex-direction:column; gap:10px; overflow-y:auto;
+  }
+  .mm-side h3{ margin:0 0 4px; font-size:14px; color:var(--accent); }
+  .mm-side label{ font-size:11px; color:var(--sub); display:block; margin-bottom:3px; }
+  .mm-side input[type=text], .mm-side select{
+    width:100%; background:#1e293b; border:1px solid var(--panel-light); color:var(--text);
+    border-radius:7px; padding:7px 10px; font-size:13px;
+  }
+  .mm-side input[type=color]{ width:100%; height:32px; border:none; border-radius:7px; cursor:pointer; padding:2px; }
+  .mm-side-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  .mm-side-actions button{ flex:1; min-width:80px; }
+
+  .mm-link-list{ font-size:11px; max-height:120px; overflow-y:auto; }
+  .mm-link-item{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:4px 6px; border-radius:5px; border:1px solid var(--panel-light); margin-bottom:3px;
+  }
+  .mm-link-item span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; color:var(--text); }
+
+  /* 학습 모드 */
+  .mm-study-wrap{ display:flex; flex-direction:column; gap:14px; }
+  .mm-breadcrumb{
+    display:flex; align-items:center; flex-wrap:wrap; gap:4px;
+    background:#0a0f1c; border:1px solid var(--panel-light); border-radius:10px;
+    padding:8px 12px; font-size:12px;
+  }
+  .mm-breadcrumb .bc-item{ color:var(--sub); }
+  .mm-breadcrumb .bc-item.current{ color:var(--text); font-weight:700; }
+  .mm-breadcrumb .bc-sep{ color:var(--panel-light); }
+
+  .mm-study-card{
+    background:#0a0f1c; border:2px solid var(--accent); border-radius:16px;
+    padding:28px 24px; text-align:center; min-height:180px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  }
+  .mm-study-label{ font-size:28px; font-weight:700; color:var(--text); }
+  .mm-study-sublabel{ font-size:14px; color:var(--sub); }
+
+  .mm-minimap-wrap{
+    background:#0a0f1c; border:1px solid var(--panel-light); border-radius:12px;
+    overflow:hidden; height:180px; position:relative;
+  }
+  #mmMinimapSvg{ width:100%; height:100%; }
+
+  .mm-study-controls{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .mm-study-controls button{ min-width:100px; }
+
+  .mm-progress-bar-outer{
+    background:var(--panel-light); border-radius:99px; height:5px; overflow:hidden;
+  }
+  .mm-progress-bar-inner{
+    height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2));
+    border-radius:99px; transition:width .3s ease;
+  }
+
+  .mm-study-q-wrap{
+    background:#0a0f1c; border:1px solid var(--panel-light); border-radius:12px;
+    padding:16px; text-align:center;
+  }
+  .mm-study-q-wrap .q-text{ font-size:15px; margin-bottom:10px; }
+  .mm-study-q-wrap input{
+    width:100%; background:#1e293b; border:1px solid var(--panel-light); color:var(--text);
+    border-radius:8px; padding:10px 14px; font-size:14px; text-align:center;
+  }
+  .mm-study-q-wrap input.correct{ border-color:var(--good); }
+  .mm-study-q-wrap input.wrong{ border-color:var(--bad); }
+  .mm-mode-btn-row{ display:flex; gap:8px; }
+  .mm-mode-btn{
+    flex:1; padding:12px; border-radius:10px; font-size:14px; font-weight:700;
+    cursor:pointer; transition:all .15s ease;
+    background:var(--panel-light); border:2px solid transparent; color:var(--text);
+  }
+  .mm-mode-btn.selected{ border-color:var(--accent); background:rgba(56,189,248,.12); }
+  .mm-mode-btn:hover{ border-color:var(--accent); }
+
+  /* ============ 모바일 화면 (iOS / 폰 스케일) 최적화 ============ */
+  @media (max-width: 680px) {
+    body {
+      padding: 12px 8px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      padding-left: max(8px, env(safe-area-inset-left));
+      padding-right: max(8px, env(safe-area-inset-right));
+      align-items: flex-start;
+    }
+    .app { width: 100%; max-width: 100%; }
+    h1 { font-size: 22px; margin-bottom: 2px; }
+    .subtitle { font-size: 12px; margin-bottom: 12px; }
+    .panel { padding: 16px 12px; border-radius: 14px; }
+
+    /* iOS Safari 인풋 자동 줌인 방지 (16px 이상 필수) */
+    input[type=text], textarea, select {
+      font-size: 16px !important;
+    }
+
+    /* 상단 액션 버튼 */
+    .top-actions { gap: 6px; margin-bottom: 12px; }
+    .top-actions button { padding: 10px 4px; font-size: 12px; }
+
+    /* 과목 그리드 - 1열 */
+    .subject-grid { grid-template-columns: 1fr; gap: 8px; }
+    .card-btn { padding: 14px; font-size: 14px; }
+
+    /* 문제 만들기 2분할 -> 모바일 1열 스택 */
+    .manage-layout { flex-direction: column; gap: 16px; }
+    .manage-left { flex: 1 1 auto; width: 100%; }
+    .manage-right {
+      flex: 1 1 auto; width: 100%; max-height: none;
+      border-top: 1px solid var(--panel-light); padding-top: 16px; padding-right: 0;
+    }
+
+    /* 터치 버튼 크기 및 간격 */
+    .del-btn, .edit-btn, .order-btn {
+      width: 34px; height: 34px; font-size: 15px;
+    }
+    .acc-q-item { padding: 10px 8px; }
+    .primary-btn { padding: 14px; font-size: 15px; }
+
+    /* 게임 화면 */
+    .target-zone { min-height: 140px; padding: 12px; }
+    .target-word { font-size: 24px; }
+    .answer-input { font-size: 18px; padding: 12px; }
+    .question-img-wrap img { max-height: 38vh; }
+    .game-side-image { flex: 0 0 auto; width: 100%; position: static; margin-bottom: 10px; padding: 6px; }
+    .game-side-image img { max-height: 40vh; }
+
+    /* 마인드맵 에디터 & 학습 모바일 */
+    .mm-grid { grid-template-columns: 1fr; }
+    .mm-editor-wrap { grid-template-columns: 1fr; height: auto; min-height: unset; }
+    .mm-canvas-wrap { height: 320px; }
+    .mm-side { max-height: none; }
+    .mm-study-label { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>타자 퀴즈</h1>
+
+  <!-- ===================== 1) 과목/주제 선택 화면 ===================== -->
+  <div id="screen-select" class="panel">
+    <div class="top-actions">
+      <button id="btnGoManage">문제 만들기</button>
+      <button id="btnGoMindmap">🧠 마인드맵</button>
+      <button id="btnGoWrong">오답노트 <span class="badge hidden" id="wrongBadge">0</span></button>
+    </div>
+    <div class="subject-grid" id="subjectGrid"></div>
+    <div class="topic-section hidden" id="topicSection">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 id="topicSectionTitle" style="margin:0;">주제 선택</h3>
+        <div style="display:flex;gap:6px;">
+          <button class="ghost-btn" id="btnSelectAllTopics" style="font-size:11px;padding:4px 8px;">전체 선택</button>
+          <button class="ghost-btn" id="btnClearTopics" style="font-size:11px;padding:4px 8px;">선택 해제</button>
+        </div>
+      </div>
+      <div class="topic-list" id="topicList"></div>
+      <div class="topic-control-bar" id="topicControlBar">
+        <button class="primary-btn" id="btnStartSelectedTopics" disabled>주제를 선택해주세요</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MM-1) 마인드맵 목록 화면 ===================== -->
+  <div id="screen-mindmap-list" class="panel hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;">🧠 마인드맵</h2>
+      <button class="ghost-btn" id="btnMmListBack">← 뒤로</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:4px;">
+      <button class="primary-btn" id="btnMmNew" style="flex:1;">+ 새 마인드맵</button>
+      <button class="ghost-btn" id="btnMmImport" style="flex:1;">📥 과목 가져오기</button>
+    </div>
+    <div class="mm-grid" id="mmGrid"></div>
+  </div>
+
+  <!-- ===================== MM-2) 마인드맵 에디터 ===================== -->
+  <div id="screen-mindmap-edit" class="panel hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="margin:0;" id="mmEditTitle">마인드맵 편집</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="ghost-btn" id="btnMmEditStudy">▶ 학습</button>
+        <button class="ghost-btn" id="btnMmEditBack">← 뒤로</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--sub);margin-bottom:8px;">
+      노드 클릭 → 편집 | 더블클릭 → 자식 추가 | 폴더/과목 드래그 → 연결
+    </div>
+    <div class="mm-editor-wrap">
+      <div class="mm-canvas-wrap" id="mmCanvasWrap">
+        <svg id="mmSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="mm-side" id="mmSide">
+        <div id="mmSidePlaceholder" style="color:var(--sub);font-size:13px;text-align:center;margin-top:20px;">
+          노드를 클릭하여<br>편집하세요
+        </div>
+        <div id="mmSideForm" class="hidden">
+          <h3 id="mmSideFormTitle">노드 편집</h3>
+          <div>
+            <label>라벨</label>
+            <input type="text" id="mmNodeLabel">
+          </div>
+          <div>
+            <label>색상</label>
+            <input type="color" id="mmNodeColor" value="#38bdf8">
+          </div>
+          <div class="mm-side-actions">
+            <button class="primary-btn" id="btnMmApplyNode">적용</button>
+            <button class="ghost-btn" id="btnMmAddChild">+ 자식</button>
+            <button class="ghost-btn" id="btnMmDeleteNode" style="border-color:var(--bad);color:var(--bad);">삭제</button>
+          </div>
+          <hr style="border-color:var(--panel-light);margin:4px 0;">
+          <div>
+            <label>연결된 문제 <button class="ghost-btn" id="btnMmLinkQ" style="font-size:10px;padding:2px 7px;border-radius:5px;float:right;">+ 연결</button></label>
+            <div class="mm-link-list" id="mmLinkList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 문제 연결 모달 -->
+    <div id="mmLinkModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;">
+      <div style="background:var(--panel);border:1px solid var(--panel-light);border-radius:16px;padding:24px;width:90%;max-width:480px;max-height:80vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;">문제 연결</h3>
+          <button class="ghost-btn" id="btnMmLinkModalClose">✕</button>
+        </div>
+        <input type="text" id="mmLinkSearch" placeholder="검색..." style="width:100%;background:#1e293b;border:1px solid var(--panel-light);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:10px;">
+        <div id="mmLinkModalList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MM-3) 마인드맵 학습 화면 ===================== -->
+  <div id="screen-mindmap-study" class="panel hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h2 style="margin:0;" id="mmStudyTitle">마인드맵 학습</h2>
+      <button class="ghost-btn" id="btnMmStudyBack">← 뒤로</button>
+    </div>
+    <!-- 모드 선택 (시작 전) -->
+    <div id="mmStudyModeSelect">
+      <p style="color:var(--sub);font-size:13px;margin:0 0 12px;">학습 모드를 선택하세요</p>
+      <div class="mm-mode-btn-row">
+        <button class="mm-mode-btn selected" id="mmModeSeq">📋 순차</button>
+        <button class="mm-mode-btn" id="mmModeRand">🔀 랜덤</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <label style="font-size:12px;color:var(--sub);display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="mmIncludeQuestions" checked>
+          연결된 문제도 함께 풀기
+        </label>
+      </div>
+      <button class="primary-btn" id="btnMmStudyStart" style="width:100%;margin-top:14px;">학습 시작</button>
+    </div>
+    <!-- 학습 진행 -->
+    <div id="mmStudyProgress" class="hidden mm-study-wrap">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--sub);">
+        <span id="mmStudyCounter">0 / 0</span>
+        <span id="mmStudyMapName"></span>
+      </div>
+      <div class="mm-progress-bar-outer"><div class="mm-progress-bar-inner" id="mmStudyBar" style="width:0%"></div></div>
+      <div class="mm-breadcrumb" id="mmStudyBreadcrumb"></div>
+      <div class="mm-minimap-wrap">
+        <svg id="mmMinimapSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="mm-study-card" id="mmStudyCard">
+        <div class="mm-study-label" id="mmStudyNodeLabel"></div>
+        <div class="mm-study-sublabel" id="mmStudyNodeSub"></div>
+      </div>
+      <!-- 연결된 문제 풀이 영역 (문제가 있을 때만 표시) -->
+      <div class="mm-study-q-wrap hidden" id="mmStudyQWrap">
+        <div class="q-text" id="mmStudyQText"></div>
+        <img id="mmStudyQImg" src="" style="max-width:100%;max-height:160px;border-radius:8px;margin-bottom:8px;display:none;">
+        <input type="text" id="mmStudyQInput" placeholder="정답 입력 후 Enter" autocomplete="off">
+        <div id="mmStudyQFeedback" style="height:20px;font-size:13px;margin-top:6px;"></div>
+      </div>
+      <div class="mm-study-controls">
+        <button class="ghost-btn" id="btnMmStudyPrev">◀ 이전</button>
+        <button class="primary-btn" id="btnMmStudyNext">다음 ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 2) 게임 화면 ===================== -->
+  <div id="screen-game" class="panel hidden">
+    <div class="hud">
+      <div id="progressDisplay">문제 0/0</div>
+      <div id="scoreDisplay">점수 0</div>
+    </div>
+    <div class="timer-info">
+      <span id="timeLeftLabel">남은 시간</span>
+      <span id="timeLimitLabel">제한 0초</span>
+    </div>
+    <div class="timer-bar-outer">
+      <div class="timer-bar-inner" id="timerBar"></div>
+    </div>
+    <div class="game-body" id="gameBody">
+      <div class="game-main" id="gameMain">
+        <div class="target-zone" id="targetZone" style="flex-direction:column;">
+          <div class="question-img-wrap hidden" id="questionImgWrap"><img id="questionImg" src="" alt="문제 이미지"></div>
+          <div class="question-text" id="questionText"></div>
+          <div class="clear-effect" id="clearEffect">격파!</div>
+        </div>
+        <input type="text" id="answerInput" class="answer-input" placeholder="" autocomplete="off">
+        <div class="strict-hint hidden" id="strictHint">🔀 정답을 순서대로 입력하세요</div>
+        <div class="footer-row">
+          <button class="ghost-btn" id="btnQuit">종료</button>
+          <button class="ghost-btn" id="btnSkip">넘기기 (Esc)</button>
+          <span id="hintDisplay" style="font-size:12px;color:var(--sub);"></span>
+        </div>
+      </div>
+      <div class="game-side-image hidden" id="gameSideImage"><img id="questionImgSide" src="" alt="문제 이미지"></div>
+    </div>
+  </div>
+
+  <!-- ===================== 3) 결과 화면 ===================== -->
+  <div id="screen-result" class="panel hidden">
+    <h2 style="text-align:center;margin:0;">게임 종료</h2>
+    <div class="result-score" id="resultScore">0점</div>
+    <div class="result-desc" id="resultDesc"></div>
+    <button class="primary-btn" id="btnRestart">과목 선택으로</button>
+  </div>
+
+  <!-- ===================== 4) 내 문제 만들기 화면 ===================== -->
+  <div id="screen-manage" class="panel hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;">문제 만들기</h2>
+      <button class="ghost-btn" id="btnManageBack">← 뒤로</button>
+    </div>
+    <div class="manage-layout">
+      <!-- 왼쪽: 입력 폼 -->
+      <div class="manage-left">
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label for="newSubject">과목</label>
+            <input type="text" id="newSubject" list="subjectOptions" placeholder="">
+            <datalist id="subjectOptions"></datalist>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="newTopic">주제</label>
+            <input type="text" id="newTopic" list="topicOptions" placeholder="">
+            <datalist id="topicOptions"></datalist>
+          </div>
+        </div>
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label for="newQuestion" style="margin:0;">질문</label>
+            <label for="questionImageFileInput" class="ghost-btn" style="padding:3px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+              📷 사진 첨부
+            </label>
+            <input type="file" id="questionImageFileInput" accept="image/*" class="hidden">
+          </div>
+          <textarea id="newQuestion"></textarea>
+          <div id="imgPastePreview" class="img-paste-preview hidden"></div>
+        </div>
+        <div class="form-group">
+          <label for="newAnswer">정답</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="newAnswer" placeholder="" style="flex:1;">
+            <button type="button" class="order-btn" id="btnToggleStrict" style="width:38px;height:38px;font-size:16px;">🔀</button>
+          </div>
+        </div>
+        <div id="editingNotice" class="form-hint hidden" style="color:var(--accent2);font-weight:700;margin-bottom:6px;">수정 중</div>
+        <div class="form-row" style="margin-bottom:10px;">
+          <button type="button" class="primary-btn" id="btnAddQuestion" style="flex:1;">문제 추가</button>
+          <button type="button" class="ghost-btn hidden" id="btnCancelEdit" style="flex:0 0 auto;">취소</button>
+        </div>
+        <div class="backup-row">
+          <button class="ghost-btn" id="btnExportBackup">백업 내보내기</button>
+          <button class="ghost-btn" id="btnImportBackup">백업 불러오기</button>
+          <input type="file" id="importFileInput" accept="application/json" class="hidden">
+        </div>
+      </div>
+      <!-- 오른쪽: 아코디언 문제 목록 -->
+      <div class="manage-right">
+        <div class="manage-right-title">문제 목록</div>
+        <div id="manageList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 5) 오답노트 화면 ===================== -->
+  <div id="screen-wrong" class="panel hidden">
+    <h2 style="margin-top:0;">오답노트</h2>
+    <button class="primary-btn" id="btnReviewWrong">오답 다시 풀기</button>
+    <button class="primary-btn" id="btnMemorize" style="margin-top:10px;background:linear-gradient(135deg,var(--accent2),var(--accent));">암기 모드</button>
+    <div class="manage-list" id="wrongList" style="margin-top:16px;"></div>
+    <div class="footer-row">
+      <button class="ghost-btn" id="btnWrongBack">← 뒤로</button>
+    </div>
+  </div>
+
+  <!-- ===================== 6) 단계별 암기 모드 화면 ===================== -->
+  <div id="screen-memorize" class="panel hidden">
+    <h2 style="margin-top:0;">암기 모드</h2>
+    <div class="hud">
+      <div id="memProgress">카드 0/0</div>
+      <div id="memStageLabel">1단계</div>
+    </div>
+    <div class="mem-stage-dots">
+      <span id="memDot1">1</span>
+      <span id="memDot2">2</span>
+      <span id="memDot3">3</span>
+    </div>
+    <div class="target-zone" id="memTargetZone" style="min-height:170px;flex-direction:column;">
+      <div class="question-img-wrap hidden" id="memImgWrap"><img id="memImg" src="" alt="문제 이미지"></div>
+      <div class="question-text" id="memQuestionText">문제</div>
+      <div class="mem-answer-area" id="memAnswerArea"></div>
+    </div>
+    <input type="text" id="memAnswerInput" class="answer-input hidden" placeholder="" autocomplete="off">
+    <div class="mem-btn-row">
+      <button class="ghost-btn" id="btnMemReveal">정답 보기</button>
+      <button class="primary-btn" id="btnMemNext">다음</button>
+    </div>
+    <div class="footer-row">
+      <button class="ghost-btn" id="btnMemBack">← 뒤로</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+ * 1. 내장 퀴즈 데이터 (과목 > 주제 > 문제/정답 계층 구조)
+ * ========================================================================= */
+const BUILTIN_DATA = {};
+
+/* =========================================================================
+ * 2. 저장소(IndexedDB + window.storage + localStorage) 연동
+ *    - IndexedDB를 메인으로 사용하여 사진(Base64)이 포함되어도 용량 제한 없이 안전하게 영구 저장
+ *    - localStorage의 기존 데이터가 있으면 IndexedDB로 자동 마이그레이션
+ * ========================================================================= */
+const STORAGE_KEY_CUSTOM = 'quiz_custom_data';
+const STORAGE_KEY_WRONG  = 'quiz_wrong_notes';
+const STORAGE_KEY_FOLDERS = 'quiz_topic_folders';
+const STORAGE_KEY_MINDMAPS = 'quiz_mindmaps';
+
+let CUSTOM_DATA = {};
+let WRONG_NOTES = [];
+let TOPIC_FOLDERS = {}; // { [subject]: { [topic]: folderName } }
+let MINDMAPS = {};      // { [mapId]: { id, title, root: Node, createdAt } }
+
+// IndexedDB 헬퍼
+const DB_NAME = 'TypingQuizDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'keyval';
+
+function getDB() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      resolve(null);
+      return;
+    }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function idbGet(key) {
+  try {
+    const db = await getDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result !== undefined ? req.result : null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function idbSet(key, value) {
+  try {
+    const db = await getDB();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put(value, key);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => resolve(false);
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+async function loadFromStorage(key) {
+  // 1. window.storage (Claude 아티팩트 등 가상 환경)
+  try {
+    if (window.storage && window.storage.get) {
+      const res = await window.storage.get(key, false);
+      if (res && res.value) return JSON.parse(res.value);
+    }
+  } catch (e) {}
+
+  // 2. IndexedDB (로컬 브라우저 - 수백 MB 대용량 지원)
+  try {
+    const val = await idbGet(key);
+    if (val !== null) {
+      return typeof val === 'string' ? JSON.parse(val) : val;
+    }
+  } catch (e) {}
+
+  // 3. localStorage 폴백 & IndexedDB로 마이그레이션
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // IndexedDB로 백업 저장
+      await idbSet(key, parsed);
+      return parsed;
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+async function saveToStorage(key, valueObj) {
+  const json = JSON.stringify(valueObj);
+
+  // 1. window.storage
+  try {
+    if (window.storage && window.storage.set) {
+      await window.storage.set(key, json, false);
+    }
+  } catch (e) {}
+
+  // 2. IndexedDB 영구 저장 (용량 제한 없이 이미지 포함 데이터 완벽 저장)
+  try {
+    await idbSet(key, valueObj);
+  } catch (e) {}
+
+  // 3. localStorage 동기화 (용량 초과 에러가 나도 IndexedDB에 이미 안전하게 저장됨)
+  try {
+    localStorage.setItem(key, json);
+  } catch (e) {
+    // localStorage 5MB 초과 시 조용히 무시 (IndexedDB가 보존함)
+  }
+}
+
+async function loadCustomData() { return (await loadFromStorage(STORAGE_KEY_CUSTOM)) || {}; }
+async function saveCustomData() { await saveToStorage(STORAGE_KEY_CUSTOM, CUSTOM_DATA); }
+async function loadWrongNotes() { return (await loadFromStorage(STORAGE_KEY_WRONG)) || []; }
+async function saveWrongNotes() { await saveToStorage(STORAGE_KEY_WRONG, WRONG_NOTES); }
+async function loadTopicFolders() { return (await loadFromStorage(STORAGE_KEY_FOLDERS)) || {}; }
+async function saveTopicFolders() { await saveToStorage(STORAGE_KEY_FOLDERS, TOPIC_FOLDERS); }
+async function loadCreatedFolders() { return (await loadFromStorage('quiz_created_folders')) || {}; }
+async function saveCreatedFolders() { await saveToStorage('quiz_created_folders', CREATED_FOLDERS); }
+async function loadMindmaps() { return (await loadFromStorage(STORAGE_KEY_MINDMAPS)) || {}; }
+async function saveMindmaps() { await saveToStorage(STORAGE_KEY_MINDMAPS, MINDMAPS); }
+
+let CREATED_FOLDERS = {}; // { [subject]: [folderName, ...] }
+
+/* =========================================================================
+ * 3. 데이터 병합 유틸 (내장 데이터 + 사용자 커스텀 데이터)
+ * ========================================================================= */
+function getMergedData() {
+  const result = {};
+  for (const subject in BUILTIN_DATA) {
+    result[subject] = {};
+    for (const topic in BUILTIN_DATA[subject]) {
+      result[subject][topic] = BUILTIN_DATA[subject][topic].map(q => ({ ...q }));
+    }
+  }
+  for (const subject in CUSTOM_DATA) {
+    if (!result[subject]) result[subject] = {};
+    for (const topic in CUSTOM_DATA[subject]) {
+      if (!result[subject][topic]) result[subject][topic] = [];
+      result[subject][topic] = result[subject][topic].concat(CUSTOM_DATA[subject][topic].map(q => ({ ...q })));
+    }
+  }
+  return result;
+}
+function getSubjectList() { return Object.keys(getMergedData()); }
+function getTopicList(subject) {
+  const merged = getMergedData();
+  return merged[subject] ? Object.keys(merged[subject]) : [];
+}
+
+// 폴더 유틸 함수 (사용자가 지정한 순서 보존)
+function getFolderList(subject) {
+  const list = [];
+  const seen = new Set();
+  if (CREATED_FOLDERS[subject]) {
+    CREATED_FOLDERS[subject].forEach(f => {
+      const trimmed = (f || '').trim();
+      if (trimmed && !seen.has(trimmed)) {
+        seen.add(trimmed);
+        list.push(trimmed);
+      }
+    });
+  }
+  if (TOPIC_FOLDERS[subject]) {
+    for (const t in TOPIC_FOLDERS[subject]) {
+      const f = (TOPIC_FOLDERS[subject][t] || '').trim();
+      if (f && !seen.has(f)) {
+        seen.add(f);
+        list.push(f);
+      }
+    }
+  }
+  return list;
+}
+
+function addCreatedFolder(subject, folder) {
+  const f = (folder || '').trim();
+  if (!f) return;
+  if (!CREATED_FOLDERS[subject]) CREATED_FOLDERS[subject] = [];
+  if (!CREATED_FOLDERS[subject].includes(f)) {
+    CREATED_FOLDERS[subject].push(f);
+  }
+}
+
+function removeFolder(subject, folder) {
+  const f = (folder || '').trim();
+  if (!f) return;
+  if (TOPIC_FOLDERS[subject]) {
+    for (const t in TOPIC_FOLDERS[subject]) {
+      if (TOPIC_FOLDERS[subject][t] === f) {
+        delete TOPIC_FOLDERS[subject][t];
+      }
+    }
+    if (Object.keys(TOPIC_FOLDERS[subject]).length === 0) delete TOPIC_FOLDERS[subject];
+  }
+  if (CREATED_FOLDERS[subject]) {
+    CREATED_FOLDERS[subject] = CREATED_FOLDERS[subject].filter(item => item !== f);
+    if (CREATED_FOLDERS[subject].length === 0) delete CREATED_FOLDERS[subject];
+  }
+}
+
+function reorderFolders(subject, fromFolderName, toFolderName, placeBefore = true) {
+  const currentList = getFolderList(subject);
+  const fromIdx = currentList.indexOf(fromFolderName);
+  if (fromIdx < 0) return;
+  currentList.splice(fromIdx, 1);
+
+  const toIdx = currentList.indexOf(toFolderName);
+  if (toIdx < 0) {
+    currentList.push(fromFolderName);
+  } else {
+    const insertIdx = placeBefore ? toIdx : toIdx + 1;
+    currentList.splice(insertIdx, 0, fromFolderName);
+  }
+  CREATED_FOLDERS[subject] = currentList;
+}
+
+function getTopicFolder(subject, topic) {
+  return (TOPIC_FOLDERS[subject] && TOPIC_FOLDERS[subject][topic]) || '';
+}
+
+function setTopicFolder(subject, topic, folder) {
+  if (!TOPIC_FOLDERS[subject]) TOPIC_FOLDERS[subject] = {};
+  const f = (folder || '').trim();
+  if (f) {
+    TOPIC_FOLDERS[subject][topic] = f;
+    addCreatedFolder(subject, f);
+  } else {
+    delete TOPIC_FOLDERS[subject][topic];
+    if (Object.keys(TOPIC_FOLDERS[subject]).length === 0) delete TOPIC_FOLDERS[subject];
+  }
+}
+
+function deleteTopicFolderMapping(subject, topic) {
+  if (TOPIC_FOLDERS[subject]) {
+    delete TOPIC_FOLDERS[subject][topic];
+    if (Object.keys(TOPIC_FOLDERS[subject]).length === 0) delete TOPIC_FOLDERS[subject];
+  }
+}
+
+/* =========================================================================
+ * 4. 게임 상태 변수
+ * ========================================================================= */
+// 제한시간 = 기본시간 + (정답 길이 × 글자당 시간), 최소/최대로 clamp
+const TIME_BASE_SEC = 6;
+const TIME_PER_CHAR_SEC = 1.1;
+const TIME_MIN_SEC = 6;
+const TIME_MAX_SEC = 30;
+
+let state = {
+  mode: 'normal',        // 'normal' | 'wrongReview'
+  subject: null,
+  topic: null,
+  questions: [],
+  currentIndex: 0,
+  score: 0,
+  timeLimit: TIME_BASE_SEC,
+  timeLeft: TIME_BASE_SEC,
+  timerId: null,
+  locked: false        // 한 문제당 정답/오답 처리가 중복 실행되는 것을 막는 잠금 플래그
+};
+
+/* =========================================================================
+ * 5. 화면 요소 참조
+ * ========================================================================= */
+const screenSelect = document.getElementById('screen-select');
+const screenGame = document.getElementById('screen-game');
+const screenResult = document.getElementById('screen-result');
+const screenManage = document.getElementById('screen-manage');
+const screenWrong = document.getElementById('screen-wrong');
+const screenMemorize = document.getElementById('screen-memorize');
+const screenMindmapList = document.getElementById('screen-mindmap-list');
+const screenMindmapEdit = document.getElementById('screen-mindmap-edit');
+const screenMindmapStudy = document.getElementById('screen-mindmap-study');
+
+const subjectGrid = document.getElementById('subjectGrid');
+const topicSection = document.getElementById('topicSection');
+const topicSectionTitle = document.getElementById('topicSectionTitle');
+const topicList = document.getElementById('topicList');
+const wrongBadge = document.getElementById('wrongBadge');
+
+const progressDisplay = document.getElementById('progressDisplay');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const timeLeftLabel = document.getElementById('timeLeftLabel');
+const timeLimitLabel = document.getElementById('timeLimitLabel');
+const timerBar = document.getElementById('timerBar');
+const questionText = document.getElementById('questionText');
+const clearEffect = document.getElementById('clearEffect');
+const answerInput = document.getElementById('answerInput');
+const targetZone = document.getElementById('targetZone');
+const hintDisplay = document.getElementById('hintDisplay');
+
+const resultScore = document.getElementById('resultScore');
+const resultDesc = document.getElementById('resultDesc');
+
+const subjectOptions = document.getElementById('subjectOptions');
+const topicOptions = document.getElementById('topicOptions');
+const newSubject = document.getElementById('newSubject');
+const newTopic = document.getElementById('newTopic');
+const newQuestion = document.getElementById('newQuestion');
+const newAnswer = document.getElementById('newAnswer');
+const btnToggleStrict = document.getElementById('btnToggleStrict');
+const strictHint = document.getElementById('strictHint');
+const manageList = document.getElementById('manageList');
+const editingNotice = document.getElementById('editingNotice');
+const btnAddQuestion = document.getElementById('btnAddQuestion');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
+
+const wrongList = document.getElementById('wrongList');
+const btnReviewWrong = document.getElementById('btnReviewWrong');
+
+const memProgress = document.getElementById('memProgress');
+const memStageLabel = document.getElementById('memStageLabel');
+const memQuestionText = document.getElementById('memQuestionText');
+const memImgWrap = document.getElementById('memImgWrap');
+const memImg = document.getElementById('memImg');
+const memAnswerArea = document.getElementById('memAnswerArea');
+const memAnswerInput = document.getElementById('memAnswerInput');
+const btnMemReveal = document.getElementById('btnMemReveal');
+const btnMemNext = document.getElementById('btnMemNext');
+const memDots = [document.getElementById('memDot1'), document.getElementById('memDot2'), document.getElementById('memDot3')];
+
+/* =========================================================================
+ * 6. 공용 유틸 함수
+ * ========================================================================= */
+
+// 문제별 고유 ID 생성 (오답노트 매칭을 위해 사용 — 질문 텍스트로만 구분하면
+// 이미지 문제처럼 질문(q)이 비어있는 문제들이 서로 겹쳐 사라지는 문제가 있었음)
+function genId() {
+  return 'q_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+}
+
+// 기존 데이터(과목/주제/문제)에 id가 없는 문제들에 id를 채워넣는다 (하위 호환)
+function backfillQuestionIds(data) {
+  let changed = false;
+  for (const subject in data) {
+    for (const topic in data[subject]) {
+      (data[subject][topic] || []).forEach(q => {
+        if (!q.id) { q.id = genId(); changed = true; }
+      });
+    }
+  }
+  return changed;
+}
+
+// Fisher-Yates 셔플: 배열을 완전 무작위로 섞는다 (원본을 바꾸지 않고 복사본 반환)
+function shuffle(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function showScreen(screenEl) {
+  [screenSelect, screenGame, screenResult, screenManage, screenWrong, screenMemorize,
+   screenMindmapList, screenMindmapEdit, screenMindmapStudy].forEach(s => s.classList.add('hidden'));
+  screenEl.classList.remove('hidden');
+  // 게임 화면을 벗어나면 이미지 2분할(옆쪽 패널) 레이아웃 흔적을 정리
+  if (screenEl !== screenGame) {
+    document.querySelector('.app').classList.remove('wide');
+    const sideImg = document.getElementById('gameSideImage');
+    if (sideImg) sideImg.classList.add('hidden');
+  }
+}
+
+// 문자열에서 공백 제거 + 소문자화 (정답 비교용 정규화)
+function normalize(str) {
+  return String(str).replace(/\s+/g, '').toLowerCase();
+}
+
+// 정답 필드("a")를 쉼표 기준으로 나눠 인정 키워드 배열로 변환
+function getKeywords(question) {
+  return String(question.a).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+// 레벤슈타인 거리(편집 거리): 두 문자열을 같게 만들기 위한 최소 삽입/삭제/치환 횟수
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,      // 삭제
+        dp[i][j - 1] + 1,      // 삽입
+        dp[i - 1][j - 1] + cost // 치환
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+/* =========================================================================
+ * 7. 정답 검증 로직 (키워드 + 오타 허용 + 다중 단어 순서 무관 매칭)
+ *
+ *    [단일 단어/구 키워드] (예: "삼각주", "인구밀집지역")
+ *      1) 완전 일치하면 정답
+ *      2) 정규화한 입력 안에 키워드가 "포함"되어 있으면 정답 (앞뒤 조사/오타 허용)
+ *      3) 입력 길이가 "키워드 길이 이상"이면서 비슷할 때만 편집 거리로 오타 허용
+ *         ※ 입력 길이가 키워드보다 짧은 경우는 절대 정답 처리하지 않음
+ *           (예: "인구밀집지"까지만 쳤는데 "인구밀집지역"으로 정답 처리되는 버그 방지)
+ *
+ *    [여러 단어로 이루어진 키워드] (예: "서산 당진 아산 천안")
+ *      - 공백으로 단어를 나눈 뒤, 입력한 단어들과 "순서 상관없이" 1:1로
+ *        모두 매칭되면 정답 처리 (예: "당진 천안 서산 아산"도 정답)
+ *      - 입력한 단어 수가 정답 단어 수보다 적으면 아직 다 안 쓴 것이므로 오답
+ *      - 각 단어끼리 매칭할 때도 위 [단일 단어] 규칙(포함/오타 허용)을 동일하게 적용
+ * ========================================================================= */
+
+// 공백 기준으로 단어 분리
+function tokenize(str) {
+  return String(str).trim().split(/\s+/).filter(Boolean);
+}
+
+// 단어(혹은 구) 하나를 비교: 완전일치 → 포함 → (입력이 정답 길이 이상일 때만) 오타 허용
+function singleMatch(typedRaw, targetRaw) {
+  const typed = normalize(typedRaw);
+  const target = normalize(targetRaw);
+  if (!target) return false;
+  if (!typed) return false;
+
+  // Exact match or full inclusion
+  if (typed === target) return true;
+  if (typed.includes(target)) return true;
+
+  // Allow target characters to appear in order within typed answer (handles particles and extra words)
+  if (isSubsequence(target, typed)) return true;
+
+  // If typed is shorter than target, it's incomplete
+  if (typed.length < target.length) return false;
+
+  // No fuzzy matching beyond above rules
+  return false;
+}
+
+// Helper: check if `sub` appears as an ordered subsequence within `str`
+function isSubsequence(sub, str) {
+  let i = 0;
+  for (const ch of str) {
+    if (ch === sub[i]) i++;
+    if (i === sub.length) return true;
+  }
+  return false;
+}
+
+// 다중 단어 키워드: 입력 단어들과 순서 무관하게 1:1 매칭되는지 확인
+function multiWordMatch(typedTokens, targetTokens) {
+  if (typedTokens.length < targetTokens.length) return false; // 단어 수가 모자라면 미완성으로 간주
+
+  const used = new Array(typedTokens.length).fill(false);
+  for (const targetWord of targetTokens) {
+    let matchedIdx = -1;
+    for (let i = 0; i < typedTokens.length; i++) {
+      if (used[i]) continue;
+      if (singleMatch(typedTokens[i], targetWord)) { matchedIdx = i; break; }
+    }
+    if (matchedIdx === -1) return false; // 이 단어와 매칭되는 입력 단어가 없음
+    used[matchedIdx] = true;
+  }
+  return true;
+}
+
+// 다중 단어 키워드 - 순서 유지 매칭: 문제에 "정답 순서 맞춤"(strict) 옵션이 켜져
+// 있을 때 사용. 입력한 단어와 정답 단어가 같은 순서(인덱스)로 매칭되어야만 정답 처리.
+function orderedMultiWordMatch(typedTokens, targetTokens) {
+  if (typedTokens.length < targetTokens.length) return false; // 단어 수가 모자라면 미완성으로 간주
+  for (let i = 0; i < targetTokens.length; i++) {
+    if (!singleMatch(typedTokens[i], targetTokens[i])) return false; // 순서가 어긋나면 오답
+  }
+  return true;
+}
+
+function isAnswerCorrect(typedRaw, question) {
+  const typedTrim = String(typedRaw).trim();
+  if (!typedTrim) return false;
+
+  const typedTokens = tokenize(typedRaw);
+  const keywords = getKeywords(question);
+  const strict = !!question.strict; // 문제별 "정답 순서 맞춤" 옵션
+
+  for (const kw of keywords) {
+    const kwTokens = tokenize(kw);
+    if (kwTokens.length === 0) continue;
+
+    if (kwTokens.length === 1) {
+      // 단일 단어/구 키워드는 공백 제거 후 통째로 비교 (기존 방식) — 순서 옵션과 무관
+      if (singleMatch(typedRaw, kw)) return true;
+    } else if (strict) {
+      // 다중 단어 키워드 + 순서 맞춤 옵션: 제시된 순서 그대로 입력해야 정답
+      if (orderedMultiWordMatch(typedTokens, kwTokens)) return true;
+    } else {
+      // 다중 단어 키워드: 순서 무관 매칭 (기존 방식)
+      if (multiWordMatch(typedTokens, kwTokens)) return true;
+    }
+  }
+  return false;
+}
+
+/* =========================================================================
+ * 8. 제한시간 계산: 정답(대표 키워드) 길이에 비례
+ * ========================================================================= */
+function computeTimeLimit(question) {
+  const primary = getKeywords(question)[0] || '';
+  const len = normalize(primary).length;
+  const raw = TIME_BASE_SEC + len * TIME_PER_CHAR_SEC;
+  return Math.min(TIME_MAX_SEC, Math.max(TIME_MIN_SEC, Math.round(raw)));
+}
+
+/* =========================================================================
+ * 9. 과목/주제 선택 화면 렌더링
+ * ========================================================================= */
+let selectedTopics = new Set();
+
+function renderSubjectGrid() {
+  subjectGrid.innerHTML = '';
+  topicSection.classList.add('hidden'); // 화면 복귀 시 이전 주제 섹션 닫기
+  topicList.innerHTML = '';
+  selectedTopics.clear();
+  state.subject = null;
+  state.topic = null;
+  updateTopicControlBar();
+
+  const subjects = getSubjectList();
+
+  if (subjects.length === 0) {
+    subjectGrid.innerHTML = '<div class="empty-msg">등록된 문제가 없습니다.</div>';
+    topicSection.classList.add('hidden');
+    return;
+  }
+
+  subjects.forEach(subject => {
+    const btn = document.createElement('button');
+    btn.className = 'card-btn';
+    btn.textContent = subject;
+    btn.onclick = () => selectSubject(subject, btn);
+    subjectGrid.appendChild(btn);
+  });
+}
+
+function selectSubject(subject, btnEl) {
+  state.subject = subject;
+  state.topic = null;
+  selectedTopics.clear();
+
+  document.querySelectorAll('#subjectGrid .card-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+
+  topicSection.classList.remove('hidden');
+  topicSectionTitle.textContent = subject;
+  topicList.innerHTML = '';
+
+  const topics = getTopicList(subject);
+  const merged = getMergedData();
+
+  // 과목 전체 버튼
+  const totalSubjCount = (merged[subject]) ? Object.values(merged[subject]).reduce((s, a) => s + a.length, 0) : 0;
+  const allChip = document.createElement('button');
+  allChip.className = 'topic-chip mode-all';
+  allChip.innerHTML = `<span>🔥 ${subject} 전체</span> <span style="font-size:11px;opacity:.85;">(${totalSubjCount})</span>`;
+  allChip.onclick = () => {
+    startGame(subject, null);
+  };
+  topicList.appendChild(allChip);
+
+  // 주제들을 폴더별로 그룹화
+  const folderMap = {};
+  const uncatTopics = [];
+
+  topics.forEach(t => {
+    const f = getTopicFolder(subject, t);
+    if (f) {
+      if (!folderMap[f]) folderMap[f] = [];
+      folderMap[f].push(t);
+    } else {
+      uncatTopics.push(t);
+    }
+  });
+
+  const createTopicChip = (topic) => {
+    const qCount = (merged[subject] && merged[subject][topic]) ? merged[subject][topic].length : 0;
+    const chip = document.createElement('button');
+    chip.className = 'topic-chip' + (selectedTopics.has(topic) ? ' selected' : '');
+    chip.innerHTML = `<span class="check-icon">✓</span><span>${topic}</span> <span style="font-size:11px;color:var(--sub);">(${qCount})</span>`;
+    chip.onclick = () => {
+      if (selectedTopics.has(topic)) {
+        selectedTopics.delete(topic);
+        chip.classList.remove('selected');
+      } else {
+        selectedTopics.add(topic);
+        chip.classList.add('selected');
+      }
+      updateTopicControlBar();
+    };
+    return chip;
+  };
+
+  // 폴더별 그룹 렌더링 (사용자가 지정한 순서대로)
+  getFolderList(subject).filter(f => folderMap[f] && folderMap[f].length > 0).forEach(folderName => {
+    const fTopics = folderMap[folderName];
+    const groupEl = document.createElement('div');
+    groupEl.className = 'topic-folder-group';
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'topic-folder-header';
+    headerEl.innerHTML = `
+      <span>📁 ${folderName} <span style="font-size:11px;color:var(--sub);font-weight:400;">(${fTopics.length})</span></span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="ghost-btn" style="font-size:10px;padding:2px 6px;border-radius:4px;" data-folder-select>선택</button>
+        <span class="folder-arrow" style="font-size:11px;">▾</span>
+      </div>
+    `;
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'topic-folder-body';
+    fTopics.forEach(t => {
+      bodyEl.appendChild(createTopicChip(t));
+    });
+
+    headerEl.querySelector('[data-folder-select]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const allSelected = fTopics.every(t => selectedTopics.has(t));
+      fTopics.forEach(t => {
+        if (allSelected) selectedTopics.delete(t);
+        else selectedTopics.add(t);
+      });
+      bodyEl.querySelectorAll('.topic-chip').forEach(c => {
+        const spanEl = c.querySelector('span:nth-child(2)');
+        const topicName = spanEl ? spanEl.textContent : '';
+        if (topicName) c.classList.toggle('selected', selectedTopics.has(topicName));
+      });
+      updateTopicControlBar();
+    });
+
+    headerEl.addEventListener('click', (e) => {
+      if (e.target.closest('[data-folder-select]')) return;
+      const isHidden = bodyEl.classList.toggle('hidden');
+      headerEl.querySelector('.folder-arrow').textContent = isHidden ? '▸' : '▾';
+    });
+
+    groupEl.appendChild(headerEl);
+    groupEl.appendChild(bodyEl);
+    topicList.appendChild(groupEl);
+  });
+
+  // 미분류 주제 렌더링
+  if (uncatTopics.length > 0) {
+    uncatTopics.forEach(t => {
+      topicList.appendChild(createTopicChip(t));
+    });
+  }
+
+  updateTopicControlBar();
+}
+
+function updateTopicControlBar() {
+  const btnStart = document.getElementById('btnStartSelectedTopics');
+  if (!btnStart) return;
+  const count = selectedTopics.size;
+
+  if (count === 0) {
+    btnStart.disabled = true;
+    btnStart.textContent = '주제를 선택해주세요';
+  } else {
+    btnStart.disabled = false;
+    let totalQuestions = 0;
+    const merged = getMergedData();
+    if (state.subject && merged[state.subject]) {
+      selectedTopics.forEach(t => {
+        if (merged[state.subject][t]) totalQuestions += merged[state.subject][t].length;
+      });
+    }
+    btnStart.textContent = `선택한 ${count}개 주제 시작 (${totalQuestions}문제)`;
+  }
+}
+
+document.getElementById('btnSelectAllTopics').addEventListener('click', () => {
+  if (!state.subject) return;
+  const topics = getTopicList(state.subject);
+  topics.forEach(t => selectedTopics.add(t));
+  document.querySelectorAll('#topicList .topic-chip:not(.mode-all)').forEach(c => c.classList.add('selected'));
+  updateTopicControlBar();
+});
+
+document.getElementById('btnClearTopics').addEventListener('click', () => {
+  selectedTopics.clear();
+  document.querySelectorAll('#topicList .topic-chip').forEach(c => c.classList.remove('selected'));
+  updateTopicControlBar();
+});
+
+document.getElementById('btnStartSelectedTopics').addEventListener('click', () => {
+  if (selectedTopics.size === 0 || !state.subject) return;
+  startGame(state.subject, Array.from(selectedTopics));
+});
+
+/* =========================================================================
+ * 10. 문제 출제 로직
+ *     - 모드 A(주제별): 선택한 단일 또는 다중 주제의 문제 배열만 셔플
+ *     - 모드 B(과목 종합): 과목 하위 모든 주제의 문제를 하나로 합친 뒤 셔플
+ *     - 각 문제에 subject/topic을 태깅해 오답노트 기록 시 사용
+ * ========================================================================= */
+function buildQuestionSet(subject, topic) {
+  const merged = getMergedData();
+  let pool = [];
+
+  if (!subject || !merged[subject]) return pool;
+
+  if (Array.isArray(topic) && topic.length > 0) {
+    topic.forEach(t => {
+      if (merged[subject] && Array.isArray(merged[subject][t])) {
+        merged[subject][t].forEach(q => pool.push({ ...q, subject, topic: t }));
+      }
+    });
+  } else if (typeof topic === 'string' && topic) {
+    if (merged[subject] && Array.isArray(merged[subject][topic])) {
+      pool = merged[subject][topic].map(q => ({ ...q, subject, topic }));
+    }
+  } else {
+    // topic이 없거나 null이면 해당 과목의 전체 주제
+    Object.keys(merged[subject]).forEach(t => {
+      if (Array.isArray(merged[subject][t])) {
+        merged[subject][t].forEach(q => pool.push({ ...q, subject, topic: t }));
+      }
+    });
+  }
+  return shuffle(pool);
+}
+
+// 오답노트 전용 문제 세트
+function buildWrongReviewSet() {
+  return shuffle(WRONG_NOTES.map(n => {
+    const item = { id: n.id, q: n.q, a: n.a, img: n.img, subject: n.subject, topic: n.topic };
+    if (n.strict) item.strict = true;
+    return item;
+  }));
+}
+
+/* =========================================================================
+ * 11. 오답노트 관리
+ *     - 고유 id로 문제를 식별한다. id가 없는 옛 데이터는 과목/주제/질문으로 대체 매칭.
+ *       (id가 없으면 질문이 빈 이미지 문제들이 서로 겹쳐 하나로 합쳐지는 문제가 있었음)
+ * ========================================================================= */
+function findWrongIndex(question) {
+  if (question.id) {
+    const byId = WRONG_NOTES.findIndex(n => n.id === question.id);
+    if (byId >= 0) return byId;
+  }
+  return WRONG_NOTES.findIndex(n => !n.id && n.subject === question.subject && n.topic === question.topic && n.q === question.q);
+}
+async function addToWrongNotes(question) {
+  const idx = findWrongIndex(question);
+  if (idx >= 0) {
+    WRONG_NOTES[idx].missCount += 1;
+    if (question.img) WRONG_NOTES[idx].img = question.img;
+    if (question.id && !WRONG_NOTES[idx].id) WRONG_NOTES[idx].id = question.id;
+    if (question.strict) WRONG_NOTES[idx].strict = true; else delete WRONG_NOTES[idx].strict;
+  } else {
+    const entry = { id: question.id || genId(), subject: question.subject, topic: question.topic, q: question.q, a: question.a, missCount: 1 };
+    if (question.img) entry.img = question.img;
+    if (question.strict) entry.strict = true;
+    WRONG_NOTES.push(entry);
+  }
+  await saveWrongNotes();
+  renderWrongBadge();
+}
+async function removeFromWrongNotes(question) {
+  const idx = findWrongIndex(question);
+  if (idx >= 0) {
+    WRONG_NOTES.splice(idx, 1);
+    await saveWrongNotes();
+    renderWrongBadge();
+  }
+}
+function renderWrongBadge() {
+  if (WRONG_NOTES.length > 0) {
+    wrongBadge.textContent = WRONG_NOTES.length;
+    wrongBadge.classList.remove('hidden');
+  } else {
+    wrongBadge.classList.add('hidden');
+  }
+  btnReviewWrong.disabled = WRONG_NOTES.length === 0;
+  const memBtn = document.getElementById('btnMemorize');
+  if (memBtn) memBtn.disabled = WRONG_NOTES.length === 0;
+}
+function renderWrongList() {
+  wrongList.innerHTML = '';
+  if (WRONG_NOTES.length === 0) {
+    wrongList.innerHTML = '<div class="empty-msg">오답노트가 비어 있습니다.</div>';
+    return;
+  }
+  WRONG_NOTES.forEach((note) => {
+    const item = document.createElement('div');
+    item.className = 'wrong-item';
+    item.innerHTML = `
+      <div class="meta">
+        <span>${note.subject} · ${note.topic}</span>
+        <span class="miss-count">틀린 횟수 ${note.missCount}</span>
+      </div>
+      ${note.img ? `<img src="${note.img}" style="max-height:80px;border-radius:6px;margin:6px 0;display:block;border:1px solid var(--panel-light);">` : ''}
+      <div class="q">${note.q || '<span style="color:var(--sub);font-style:italic;">(이미지 문제)</span>'}</div>
+      <div class="a">정답: ${note.a}${note.strict ? ' <span style="color:var(--accent2);font-weight:700;">· 🔀순서유지</span>' : ''}</div>
+    `;
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del-btn';
+    delBtn.textContent = '✕';
+    delBtn.style.marginTop = '8px';
+    delBtn.onclick = async () => {
+      await removeFromWrongNotes(note);
+      renderWrongList();
+    };
+    item.appendChild(delBtn);
+    wrongList.appendChild(item);
+  });
+}
+
+/* =========================================================================
+ * 11-1. 단계별 암기 모드 (오답노트 전용)
+ * ========================================================================= */
+const CHOSEONG_LIST = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+
+function toChoseong(str) {
+  return String(str).split('').map(ch => {
+    const code = ch.charCodeAt(0);
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      const choIndex = Math.floor((code - 0xAC00) / (21 * 28));
+      return CHOSEONG_LIST[choIndex];
+    }
+    return ch;
+  }).join('');
+}
+
+const MEM_STAGE_NAMES = {
+  1: '1단계',
+  2: '2단계 (초성)',
+  3: '3단계 (입력)'
+};
+
+let memState = { items: [], order: [], index: 0, stage: 1 };
+
+function startMemorize() {
+  if (WRONG_NOTES.length === 0) return;
+  memState.items = WRONG_NOTES.map(n => ({ ...n }));
+  memState.stage = 1;
+  memState.index = 0;
+  memState.order = shuffle(memState.items);
+  showScreen(screenMemorize);
+  renderMemCard();
+}
+
+function updateMemDots() {
+  memDots.forEach((dot, i) => {
+    const s = i + 1;
+    dot.classList.toggle('active', s === memState.stage);
+    dot.classList.toggle('done', s < memState.stage);
+  });
+}
+
+function renderMemCard() {
+  if (memState.index >= memState.order.length) {
+    if (memState.stage < 3) {
+      memState.stage += 1;
+      memState.index = 0;
+      memState.order = shuffle(memState.items);
+    } else {
+      alert('암기를 완료했습니다.');
+      showScreen(screenWrong);
+      renderWrongList();
+      return;
+    }
+  }
+
+  const item = memState.order[memState.index];
+  const primaryAnswer = getKeywords(item)[0] || item.a;
+
+  memProgress.textContent = `${memState.stage}단계 · ${memState.index + 1}/${memState.order.length}`;
+  memStageLabel.textContent = MEM_STAGE_NAMES[memState.stage];
+  memQuestionText.textContent = item.q || '';
+  memQuestionText.style.display = item.q ? '' : 'none';
+  if (item.img) {
+    memImg.src = item.img;
+    memImgWrap.classList.remove('hidden');
+  } else {
+    memImg.src = '';
+    memImgWrap.classList.add('hidden');
+  }
+  memAnswerInput.value = '';
+  memAnswerInput.classList.add('hidden');
+  memAnswerInput.style.borderColor = '';
+  updateMemDots();
+
+  const isLastCardOfStage = memState.index === memState.order.length - 1;
+
+  if (memState.stage === 1) {
+    memAnswerArea.innerHTML = `<div class="full">${item.a}</div>`;
+    btnMemReveal.classList.add('hidden');
+    btnMemNext.textContent = isLastCardOfStage ? '2단계' : '다음';
+  } else if (memState.stage === 2) {
+    memAnswerArea.innerHTML = `<div class="choseong">${toChoseong(primaryAnswer)}</div>`;
+    btnMemReveal.classList.remove('hidden');
+    btnMemReveal.textContent = '정답 보기';
+    btnMemNext.textContent = isLastCardOfStage ? '3단계' : '다음';
+  } else {
+    memAnswerArea.innerHTML = '';
+    memAnswerInput.classList.remove('hidden');
+    memAnswerInput.focus();
+    btnMemReveal.classList.remove('hidden');
+    btnMemReveal.textContent = '정답 보기';
+    btnMemNext.textContent = isLastCardOfStage ? '완료' : '다음';
+  }
+}
+
+memAnswerInput.addEventListener('input', () => {
+  const item = memState.order[memState.index];
+  if (isAnswerCorrect(memAnswerInput.value, item)) {
+    memAnswerInput.style.borderColor = 'var(--good)';
+    memAnswerArea.innerHTML = `<div class="reveal">✅ 정답: ${item.a}</div>`;
+  }
+});
+
+btnMemReveal.addEventListener('click', () => {
+  const item = memState.order[memState.index];
+  if (!memAnswerArea.querySelector('.reveal')) {
+    memAnswerArea.insertAdjacentHTML('beforeend', `<div class="reveal">정답: ${item.a}</div>`);
+  }
+});
+
+btnMemNext.addEventListener('click', () => {
+  memState.index += 1;
+  renderMemCard();
+});
+
+document.getElementById('btnMemorize').addEventListener('click', startMemorize);
+document.getElementById('btnMemBack').addEventListener('click', () => {
+  showScreen(screenWrong);
+  renderWrongList();
+});
+
+/* =========================================================================
+ * 12. 게임 시작 / 진행 / 종료
+ * ========================================================================= */
+function startGame(subject, topic) {
+  const questions = buildQuestionSet(subject, topic);
+  if (questions.length === 0) {
+    alert('선택한 주제에 출제할 수 있는 문제가 없습니다.');
+    return;
+  }
+  state.mode = 'normal';
+  state.subject = subject;
+  state.topic = topic;
+  state.questions = questions;
+  state.currentIndex = 0;
+  state.score = 0;
+  state.locked = false;
+
+  if (Array.isArray(topic)) {
+    hintDisplay.textContent = topic.length === 1 ? topic[0] : `${topic[0]} 외 ${topic.length - 1}개 주제`;
+  } else {
+    hintDisplay.textContent = topic ? `${topic}` : `${subject}`;
+  }
+
+  showScreen(screenGame);
+  renderHUD();
+  loadQuestion();
+}
+
+function startWrongReview() {
+  if (WRONG_NOTES.length === 0) return;
+  const questions = buildWrongReviewSet();
+  if (questions.length === 0) {
+    alert('복습할 오답 문제가 없습니다.');
+    return;
+  }
+  state.mode = 'wrongReview';
+  state.subject = '오답노트';
+  state.topic = null;
+  state.questions = questions;
+  state.currentIndex = 0;
+  state.score = 0;
+  state.locked = false;
+
+  hintDisplay.textContent = `오답노트 (${state.questions.length})`;
+
+  showScreen(screenGame);
+  renderHUD();
+  loadQuestion();
+}
+
+function renderHUD() {
+  progressDisplay.textContent = `문제 ${state.currentIndex + 1}/${state.questions.length}`;
+  scoreDisplay.textContent = `점수 ${state.score}`;
+}
+
+function loadQuestion() {
+  if (state.questions.length === 0) { endGame(); return; }
+
+  // 모든 문제를 다 풀었으면 반복하지 않고 바로 결과 화면으로 종료
+  if (state.currentIndex >= state.questions.length) {
+    endGame();
+    return;
+  }
+
+  const current = state.questions[state.currentIndex];
+  state.timeLimit = computeTimeLimit(current);
+  state.locked = false; // 새 문제 시작 — 정답/오답 처리 잠금 해제
+
+  questionText.textContent = current.q || '';
+  if (!current.q) {
+    questionText.classList.add('hidden');
+  } else {
+    questionText.classList.remove('hidden');
+  }
+
+  renderQuestionImage(current);
+
+  strictHint.classList.toggle('hidden', !current.strict);
+
+  answerInput.value = '';
+  answerInput.classList.remove('wrong');
+  clearEffect.classList.remove('play');
+  answerInput.disabled = false;
+  answerInput.focus();
+
+  renderHUD();
+  startTimer();
+}
+
+/* =========================================================================
+ * 12-1. 문제 이미지 표시
+ *   - 가로로 긴(landscape) 이미지: 문제 영역 안에 크게 인라인으로 표시
+ *   - 세로로 긴(portrait) 이미지: 화면을 2분할해서 옆쪽 패널에 크게 표시
+ * ========================================================================= */
+function renderQuestionImage(current) {
+  const appEl = document.querySelector('.app');
+  const questionImgWrap = document.getElementById('questionImgWrap');
+  const questionImg = document.getElementById('questionImg');
+  const gameSideImage = document.getElementById('gameSideImage');
+  const questionImgSide = document.getElementById('questionImgSide');
+
+  // 초기화
+  questionImg.src = '';
+  questionImgSide.src = '';
+  questionImgWrap.classList.add('hidden');
+  gameSideImage.classList.add('hidden');
+  appEl.classList.remove('wide');
+
+  if (!current.img) return;
+
+  const requestedImg = current.img;
+  const probe = new Image();
+  probe.onload = () => {
+    // 그 사이 다음 문제로 넘어갔다면 반영하지 않음
+    if (state.questions[state.currentIndex] !== current) return;
+
+    const w = probe.naturalWidth || 1;
+    const h = probe.naturalHeight || 1;
+    const isPortrait = h > w * 1.1; // 세로로 긴 사진
+
+    if (isPortrait) {
+      questionImgSide.src = requestedImg;
+      gameSideImage.classList.remove('hidden');
+      appEl.classList.add('wide');
+    } else {
+      questionImg.src = requestedImg;
+      questionImgWrap.classList.remove('hidden');
+    }
+  };
+  probe.onerror = () => {
+    if (state.questions[state.currentIndex] !== current) return;
+    // 크기를 알 수 없으면 기본(인라인) 방식으로 표시
+    questionImg.src = requestedImg;
+    questionImgWrap.classList.remove('hidden');
+  };
+  probe.src = requestedImg;
+}
+
+/* =========================================================================
+ * 13. 타이머 로직
+ * ========================================================================= */
+function startTimer() {
+  clearInterval(state.timerId);
+  state.timeLeft = state.timeLimit;
+  timeLimitLabel.textContent = `제한 ${state.timeLimit}초`;
+  updateTimerBar();
+
+  const tickMs = 100;
+  state.timerId = setInterval(() => {
+    state.timeLeft -= tickMs / 1000;
+    if (state.timeLeft <= 0) {
+      state.timeLeft = 0;
+      updateTimerBar();
+      clearInterval(state.timerId);
+      handleTimeout();
+    } else {
+      updateTimerBar();
+    }
+  }, tickMs);
+}
+
+function updateTimerBar() {
+  const ratio = state.timeLeft / state.timeLimit;
+  timerBar.style.width = `${ratio * 100}%`;
+  timerBar.style.backgroundColor = ratio < 0.25 ? 'var(--bad)' : (ratio < 0.5 ? 'var(--warn)' : 'var(--accent)');
+}
+
+/* =========================================================================
+ * 13-1. 오답 처리 공통 로직
+ * ========================================================================= */
+function markWrong() {
+  // 같은 문제에 대해 타임아웃/넘기기 등이 겹쳐 두 번 처리되는 것을 방지
+  // (겹쳐 실행되면 currentIndex가 두 칸씩 건너뛰어 문제를 다 풀기도 전에
+  //  결과 화면(0점)으로 튕기는 원인이 되었음)
+  if (state.locked) return;
+  state.locked = true;
+  answerInput.disabled = true;
+  targetZone.classList.add('fail-flash');
+  setTimeout(() => targetZone.classList.remove('fail-flash'), 400);
+  const current = state.questions[state.currentIndex];
+  addToWrongNotes(current).catch(() => {}); // 저장은 비동기로 진행, 화면 전환을 막지 않음
+  renderHUD();
+  setTimeout(() => { state.currentIndex += 1; loadQuestion(); }, 700);
+}
+
+function skipQuestion() {
+  if (screenGame.classList.contains('hidden')) return;
+  if (state.questions.length === 0) return;
+  clearInterval(state.timerId);
+  markWrong();
+}
+
+answerInput.addEventListener('input', () => {
+  const current = state.questions[state.currentIndex];
+  if (isAnswerCorrect(answerInput.value, current)) handleCorrect();
+});
+
+answerInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const current = state.questions[state.currentIndex];
+    if (!isAnswerCorrect(answerInput.value, current)) {
+      answerInput.classList.add('wrong');
+      setTimeout(() => answerInput.classList.remove('wrong'), 250);
+    }
+  }
+});
+
+function handleCorrect() {
+  if (state.locked) return; // 중복 실행 방지 (markWrong과 동일한 이유)
+  state.locked = true;
+  clearInterval(state.timerId);
+  answerInput.disabled = true;
+  state.score += 1;
+
+  clearEffect.textContent = '💥 격파!';
+  clearEffect.classList.add('play');
+  renderHUD();
+
+  // 오답노트에 있던 문제를 맞혔다면 자동으로 제거 (복습 완료 처리)
+  const current = state.questions[state.currentIndex];
+  removeFromWrongNotes(current);
+
+  setTimeout(() => {
+    state.currentIndex += 1;
+    loadQuestion();
+  }, 500);
+}
+
+function handleTimeout() {
+  markWrong();
+}
+
+function endGame() {
+  clearInterval(state.timerId);
+  showScreen(screenResult);
+  resultScore.textContent = `${state.score}점`;
+  let desc = state.subject;
+  if (Array.isArray(state.topic)) {
+    desc += ` (${state.topic.join(', ')})`;
+  } else if (state.topic) {
+    desc += ` · ${state.topic}`;
+  } else if (state.mode !== 'wrongReview') {
+    desc += ' (전체)';
+  }
+  resultDesc.textContent = `${desc} 결과입니다.`;
+}
+
+/* =========================================================================
+ * 15. 내 문제 만들기 화면
+ * ========================================================================= */
+function renderDatalists() {
+  subjectOptions.innerHTML = getSubjectList().map(s => `<option value="${s}">`).join('');
+  const subj = newSubject.value.trim();
+  topicOptions.innerHTML = subj ? getTopicList(subj).map(t => `<option value="${t}">`).join('') : '';
+}
+newSubject.addEventListener('input', renderDatalists);
+
+/* 아코디언 열림 상태 */
+let openSections = {};
+
+function renderManageList() {
+  manageList.innerHTML = '';
+  const subjects = Object.keys(CUSTOM_DATA);
+  if (subjects.length === 0) {
+    manageList.innerHTML = '<div class="empty-msg" style="padding:30px 0;text-align:center;">등록된 문제가 없습니다.</div>';
+    return;
+  }
+
+  subjects.forEach(subject => {
+    const subjectKey = subject;
+    if (openSections[subjectKey] === undefined) openSections[subjectKey] = false;
+    const isSubjectOpen = openSections[subjectKey];
+    const totalCount = Object.values(CUSTOM_DATA[subject]).reduce((s, arr) => s + arr.length, 0);
+
+    const subjectEl = document.createElement('div');
+    subjectEl.className = 'acc-subject';
+
+    const subjectHeader = document.createElement('div');
+    subjectHeader.className = 'acc-subject-header';
+    subjectHeader.innerHTML = `
+      <span>${subject} <span style="color:var(--sub);font-weight:400;">(${totalCount}문제)</span></span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="ghost-btn" style="font-size:10px;padding:3px 8px;border-radius:5px;" data-add-folder>+ 폴더</button>
+        <span style="font-size:12px;">${isSubjectOpen ? '▾' : '▸'}</span>
+      </div>
+    `;
+
+    subjectHeader.querySelector('[data-add-folder]').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const folderName = prompt(`"${subject}" 과목에 추가할 폴더 이름을 입력하세요:`);
+      if (folderName && folderName.trim()) {
+        addCreatedFolder(subject, folderName.trim());
+        await saveCreatedFolders();
+        openSections[subjectKey] = true;
+        openSections[subject + ':folder:' + folderName.trim()] = true;
+        renderManageList();
+        renderSubjectGrid();
+      }
+    });
+
+    subjectHeader.addEventListener('click', (e) => {
+      if (e.target.closest('[data-add-folder]')) return;
+      openSections[subjectKey] = !openSections[subjectKey];
+      renderManageList();
+    });
+
+    const subjectBody = document.createElement('div');
+    subjectBody.className = 'acc-subject-body';
+    if (!isSubjectOpen) subjectBody.classList.add('hidden');
+
+    // 주제들을 폴더별로 분류
+    const allTopics = Object.keys(CUSTOM_DATA[subject]);
+    const folderList = getFolderList(subject);
+    const folderMap = {};
+    folderList.forEach(f => { folderMap[f] = []; });
+    const uncatTopics = [];
+
+    allTopics.forEach(topic => {
+      const folderName = getTopicFolder(subject, topic);
+      if (folderName && folderMap[folderName]) {
+        folderMap[folderName].push(topic);
+      } else {
+        uncatTopics.push(topic);
+      }
+    });
+
+    const renderTopicItem = (topic, parentContainer) => {
+      const topicKey = subject + ':' + topic;
+      if (openSections[topicKey] === undefined) openSections[topicKey] = false;
+      const isTopicOpen = openSections[topicKey];
+      const questions = CUSTOM_DATA[subject][topic] || [];
+
+      const topicEl = document.createElement('div');
+      topicEl.className = 'acc-topic';
+      topicEl.setAttribute('draggable', 'true');
+
+      topicEl.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        topicEl.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/json', JSON.stringify({ subject, topic }));
+      });
+      topicEl.addEventListener('dragend', () => {
+        topicEl.classList.remove('dragging');
+      });
+
+      const topicHeader = document.createElement('div');
+      topicHeader.className = 'acc-topic-header';
+      topicHeader.innerHTML = `
+        <span style="display:flex;align-items:center;">
+          <span class="drag-handle">⠿</span>
+          <span>${topic}</span>
+          <span style="color:var(--sub);margin-left:4px;">(${questions.length})</span>
+        </span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="ghost-btn" style="font-size:10px;padding:3px 8px;border-radius:5px;" data-del-topic>삭제</button>
+          <span style="font-size:11px;">${isTopicOpen ? '▾' : '▸'}</span>
+        </div>
+      `;
+
+      topicHeader.querySelector('[data-del-topic]').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(`"${subject} · ${topic}" 문제를 모두 삭제할까요?`)) return;
+        delete CUSTOM_DATA[subject][topic];
+        deleteTopicFolderMapping(subject, topic);
+        if (Object.keys(CUSTOM_DATA[subject]).length === 0) delete CUSTOM_DATA[subject];
+        delete openSections[topicKey];
+        await saveCustomData();
+        await saveTopicFolders();
+        renderManageList(); renderDatalists(); renderSubjectGrid();
+      });
+
+      topicHeader.addEventListener('click', (e) => {
+        if (e.target.closest('[data-del-topic]')) return;
+        openSections[topicKey] = !openSections[topicKey];
+        renderManageList();
+      });
+
+      const topicBody = document.createElement('div');
+      topicBody.className = 'acc-topic-body';
+      if (!isTopicOpen) topicBody.classList.add('hidden');
+
+      questions.forEach((q, idx) => {
+        const qItem = document.createElement('div');
+        qItem.className = 'acc-q-item';
+        if (q.img) {
+          const imgEl = document.createElement('img');
+          imgEl.className = 'manage-item-img';
+          imgEl.src = q.img;
+          imgEl.alt = '이미지';
+          qItem.appendChild(imgEl);
+        }
+        const textWrap = document.createElement('div');
+        textWrap.className = 'acc-q-text-wrap';
+        const strictBadge = q.strict ? ' <span style="color:var(--accent2);font-weight:700;">· 🔀</span>' : '';
+        textWrap.innerHTML = `<div class="acc-q-text">${q.q || '<span style="color:var(--sub);font-style:italic;">(이미지 문제)</span>'}</div><div class="acc-q-ans">정답: ${q.a}${strictBadge}</div>`;
+        qItem.appendChild(textWrap);
+
+        const actions = document.createElement('div');
+        actions.className = 'manage-item-actions';
+
+        const orderBtn = document.createElement('button');
+        orderBtn.className = 'order-btn' + (q.strict ? ' active' : '');
+        orderBtn.textContent = '🔀';
+        orderBtn.onclick = async (e) => {
+          e.stopPropagation();
+          if (q.strict) delete q.strict; else q.strict = true;
+          await saveCustomData();
+          renderManageList();
+        };
+        actions.appendChild(orderBtn);
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'edit-btn';
+        editBtn.textContent = '✏️';
+        editBtn.onclick = () => startEditQuestion(subject, topic, idx);
+        actions.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'del-btn';
+        delBtn.textContent = '✕';
+        delBtn.onclick = async () => {
+          CUSTOM_DATA[subject][topic].splice(idx, 1);
+          if (CUSTOM_DATA[subject][topic].length === 0) {
+            delete CUSTOM_DATA[subject][topic];
+            deleteTopicFolderMapping(subject, topic);
+            delete openSections[topicKey];
+          }
+          if (Object.keys(CUSTOM_DATA[subject]).length === 0) { delete CUSTOM_DATA[subject]; delete openSections[subjectKey]; }
+          if (editingItem && editingItem.subject === subject && editingItem.topic === topic && editingItem.idx === idx) cancelEdit();
+          await saveCustomData();
+          await saveTopicFolders();
+          renderManageList(); renderDatalists(); renderSubjectGrid();
+        };
+        actions.appendChild(delBtn);
+        qItem.appendChild(actions);
+        topicBody.appendChild(qItem);
+      });
+
+      topicEl.appendChild(topicHeader);
+      topicEl.appendChild(topicBody);
+      parentContainer.appendChild(topicEl);
+    };
+
+    // 1. 폴더 그룹들 렌더링 (드롭 대상 & 순서 재배치 드래그 지원)
+    folderList.forEach(folderName => {
+      const folderKey = subject + ':folder:' + folderName;
+      if (openSections[folderKey] === undefined) openSections[folderKey] = false;
+      const isFolderOpen = openSections[folderKey];
+      const fTopics = folderMap[folderName] || [];
+      const folderQCount = fTopics.reduce((s, t) => s + (CUSTOM_DATA[subject][t]?.length || 0), 0);
+
+      const folderEl = document.createElement('div');
+      folderEl.className = 'acc-folder';
+      folderEl.setAttribute('draggable', 'true');
+
+      // 폴더 드래그 시작 (순서 재배치용)
+      folderEl.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        folderEl.classList.add('dragging-folder');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'folder', subject, folderName }));
+      });
+
+      folderEl.addEventListener('dragend', () => {
+        folderEl.classList.remove('dragging-folder');
+        document.querySelectorAll('.acc-folder').forEach(el => {
+          el.classList.remove('drag-over', 'drag-folder-above', 'drag-folder-below');
+        });
+      });
+
+      // 드래그 오버 (폴더 재배치 또는 주제 담기)
+      folderEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+
+        const rect = folderEl.getBoundingClientRect();
+        const relY = e.clientY - rect.top;
+        const isUpper = relY < rect.height / 2;
+
+        folderEl.classList.add('drag-over');
+        if (isUpper) {
+          folderEl.classList.add('drag-folder-above');
+          folderEl.classList.remove('drag-folder-below');
+        } else {
+          folderEl.classList.add('drag-folder-below');
+          folderEl.classList.remove('drag-folder-above');
+        }
+      });
+
+      folderEl.addEventListener('dragleave', () => {
+        folderEl.classList.remove('drag-over', 'drag-folder-above', 'drag-folder-below');
+      });
+
+      folderEl.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = folderEl.getBoundingClientRect();
+        const isUpper = (e.clientY - rect.top) < rect.height / 2;
+        folderEl.classList.remove('drag-over', 'drag-folder-above', 'drag-folder-below');
+
+        try {
+          const data = JSON.parse(e.dataTransfer.getData('application/json'));
+          if (data.type === 'folder') {
+            // 1. 폴더 순서 재배치!
+            if (data.subject === subject && data.folderName !== folderName) {
+              reorderFolders(subject, data.folderName, folderName, isUpper);
+              await saveCreatedFolders();
+              renderManageList();
+              renderSubjectGrid();
+            }
+          } else if (data.topic) {
+            // 2. 주제를 폴더에 넣기!
+            if (data.subject === subject) {
+              setTopicFolder(subject, data.topic, folderName);
+              openSections[folderKey] = true;
+              await saveTopicFolders();
+              renderManageList();
+              renderSubjectGrid();
+            }
+          }
+        } catch (err) {}
+      });
+
+      const folderHeader = document.createElement('div');
+      folderHeader.className = 'acc-folder-header';
+      folderHeader.innerHTML = `
+        <span style="display:flex;align-items:center;">
+          <span class="drag-handle">⠿</span>
+          <span>📁 ${folderName}</span>
+          <span style="color:var(--sub);font-weight:400;margin-left:4px;">(${folderQCount}문제)</span>
+        </span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="ghost-btn" style="font-size:10px;padding:3px 8px;border-radius:5px;" data-del-folder>삭제</button>
+          <span style="font-size:11px;">${isFolderOpen ? '▾' : '▸'}</span>
+        </div>
+      `;
+
+      folderHeader.querySelector('[data-del-folder]').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(`"${folderName}" 폴더를 삭제할까요? (안의 주제들은 폴더 밖으로 이동됩니다)`)) return;
+        removeFolder(subject, folderName);
+        delete openSections[folderKey];
+        await saveTopicFolders();
+        await saveCreatedFolders();
+        renderManageList();
+        renderSubjectGrid();
+      });
+
+      folderHeader.addEventListener('click', (e) => {
+        if (e.target.closest('[data-del-folder]')) return;
+        openSections[folderKey] = !openSections[folderKey];
+        renderManageList();
+      });
+
+      const folderBody = document.createElement('div');
+      folderBody.className = 'acc-folder-body';
+      if (!isFolderOpen) folderBody.classList.add('hidden');
+
+      fTopics.forEach(t => renderTopicItem(t, folderBody));
+
+      folderEl.appendChild(folderHeader);
+      folderEl.appendChild(folderBody);
+      subjectBody.appendChild(folderEl);
+    });
+
+    // 2. 미분류 주제 드롭 영역 (폴더 밖으로 빼기)
+    const uncatContainer = document.createElement('div');
+    uncatContainer.className = 'acc-uncat-area';
+
+    uncatContainer.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      uncatContainer.classList.add('drag-over');
+    });
+    uncatContainer.addEventListener('dragleave', () => uncatContainer.classList.remove('drag-over'));
+    uncatContainer.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      uncatContainer.classList.remove('drag-over');
+      try {
+        const data = JSON.parse(e.dataTransfer.getData('application/json'));
+        if (data.subject === subject && data.topic) {
+          setTopicFolder(subject, data.topic, '');
+          await saveTopicFolders();
+          renderManageList();
+          renderSubjectGrid();
+        }
+      } catch (err) {}
+    });
+
+    uncatTopics.forEach(t => renderTopicItem(t, uncatContainer));
+    subjectBody.appendChild(uncatContainer);
+
+    subjectEl.appendChild(subjectHeader);
+    subjectEl.appendChild(subjectBody);
+    manageList.appendChild(subjectEl);
+  });
+}
+
+/* =========================================================================
+ * 15-0. 기존 문제 수정
+ * ========================================================================= */
+let editingItem = null; // { subject, topic, idx } | null
+
+function startEditQuestion(subject, topic, idx) {
+  const q = CUSTOM_DATA[subject][topic][idx];
+  if (!q) return;
+  editingItem = { subject, topic, idx };
+
+  newSubject.value = subject;
+  newTopic.value = topic;
+  newQuestion.value = q.q || '';
+  newAnswer.value = q.a;
+  btnToggleStrict.classList.toggle('active', !!q.strict);
+
+  if (q.img) {
+    setDropzoneImage(q.img);
+  } else {
+    clearDropzoneImage();
+  }
+  renderDatalists();
+  updateEditModeUI();
+
+  newSubject.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  newQuestion.focus();
+}
+
+function cancelEdit() {
+  editingItem = null;
+  newSubject.value = '';
+  newTopic.value = '';
+  newQuestion.value = '';
+  newAnswer.value = '';
+  btnToggleStrict.classList.remove('active');
+  clearDropzoneImage();
+  updateEditModeUI();
+}
+
+function updateEditModeUI() {
+  const isEditing = !!editingItem;
+  btnAddQuestion.textContent = isEditing ? '수정 완료' : '문제 추가';
+  editingNotice.classList.toggle('hidden', !isEditing);
+  btnCancelEdit.classList.toggle('hidden', !isEditing);
+}
+
+btnCancelEdit.addEventListener('click', cancelEdit);
+
+btnToggleStrict.addEventListener('click', () => {
+  btnToggleStrict.classList.toggle('active');
+});
+
+document.addEventListener('keydown', (e) => {
+  if (screenManage.classList.contains('hidden')) return;
+  const key = e.key.toLowerCase();
+  if (e.metaKey && e.altKey && key === 'o') {
+    e.preventDefault();
+    btnToggleStrict.click();
+  }
+});
+
+// 오답노트에 같은 문제가 있으면 수정된 내용으로 함께 갱신
+async function syncWrongNoteOnEdit(oldId, oldSubject, oldTopic, oldQ, newSubjectVal, newTopicVal, newQVal, newAVal, newImgVal, newStrictVal) {
+  let idx = oldId ? WRONG_NOTES.findIndex(n => n.id === oldId) : -1;
+  if (idx < 0) idx = WRONG_NOTES.findIndex(n => !n.id && n.subject === oldSubject && n.topic === oldTopic && n.q === oldQ);
+  if (idx >= 0) {
+    WRONG_NOTES[idx].subject = newSubjectVal;
+    WRONG_NOTES[idx].topic = newTopicVal;
+    WRONG_NOTES[idx].q = newQVal;
+    WRONG_NOTES[idx].a = newAVal;
+    if (newImgVal) WRONG_NOTES[idx].img = newImgVal;
+    else delete WRONG_NOTES[idx].img;
+    if (newStrictVal) WRONG_NOTES[idx].strict = true;
+    else delete WRONG_NOTES[idx].strict;
+    await saveWrongNotes();
+    renderWrongBadge();
+  }
+}
+
+async function submitQuestion() {
+  const subject = newSubject.value.trim();
+  const topic = newTopic.value.trim();
+  const q = newQuestion.value.trim();
+  const a = newAnswer.value.trim();
+  const img = currentImgBase64 || null;
+  const isStrict = btnToggleStrict.classList.contains('active');
+
+  if (!subject || !topic || !a) {
+    alert('과목, 주제, 정답을 입력해주세요.');
+    return;
+  }
+  if (!q && !img) {
+    alert('질문 또는 이미지를 등록해주세요.');
+    return;
+  }
+
+  if (editingItem) {
+    const { subject: oldSubject, topic: oldTopic, idx: oldIdx } = editingItem;
+    const oldEntry = CUSTOM_DATA[oldSubject] && CUSTOM_DATA[oldSubject][oldTopic]
+      ? CUSTOM_DATA[oldSubject][oldTopic][oldIdx]
+      : null;
+    const oldQ = oldEntry ? oldEntry.q : null;
+    const oldId = oldEntry ? oldEntry.id : null;
+
+    if (oldEntry) {
+      CUSTOM_DATA[oldSubject][oldTopic].splice(oldIdx, 1);
+      if (CUSTOM_DATA[oldSubject][oldTopic].length === 0) delete CUSTOM_DATA[oldSubject][oldTopic];
+      if (Object.keys(CUSTOM_DATA[oldSubject]).length === 0) delete CUSTOM_DATA[oldSubject];
+    }
+
+    if (!CUSTOM_DATA[subject]) CUSTOM_DATA[subject] = {};
+    if (!CUSTOM_DATA[subject][topic]) CUSTOM_DATA[subject][topic] = [];
+    const entry = { id: oldId || genId(), q, a };
+    if (img) entry.img = img;
+    if (isStrict) entry.strict = true;
+    CUSTOM_DATA[subject][topic].push(entry);
+
+    await saveCustomData();
+    if (oldQ !== null) {
+      await syncWrongNoteOnEdit(oldId, oldSubject, oldTopic, oldQ, subject, topic, q, a, img, isStrict);
+    }
+
+    cancelEdit();
+  } else {
+    // 새 문제 추가
+    if (!CUSTOM_DATA[subject]) CUSTOM_DATA[subject] = {};
+    if (!CUSTOM_DATA[subject][topic]) CUSTOM_DATA[subject][topic] = [];
+    const entry = { id: genId(), q, a };
+    if (img) entry.img = img;
+    if (isStrict) entry.strict = true;
+    CUSTOM_DATA[subject][topic].push(entry);
+
+    await saveCustomData();
+
+    newQuestion.value = '';
+    newAnswer.value = '';
+    btnToggleStrict.classList.remove('active');
+    clearDropzoneImage();
+
+    // 모바일 환경에서는 키보드가 계속 열려서 화면을 가리는 현상 방지
+    const isMobile = window.innerWidth <= 680 || ('ontouchstart' in window);
+    if (!isMobile) {
+      newQuestion.focus();
+    } else {
+      document.activeElement?.blur();
+    }
+  }
+
+  // 추가된 과목·주제 섹션 자동으로 열기
+  openSections[subject] = true;
+  openSections[subject + ':' + topic] = true;
+
+  renderManageList();
+  renderDatalists();
+  renderSubjectGrid();
+}
+
+// 1. 일반 클릭
+btnAddQuestion.addEventListener('click', submitQuestion);
+
+// 2. 모바일 Safari 등 터치 시 키보드 닫힘으로 인한 클릭 씹힘 방지
+btnAddQuestion.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  submitQuestion();
+});
+
+// 3. 정답 입력창에서 엔터(Enter) 입력 시 즉시 문제 추가
+newAnswer.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    submitQuestion();
+  }
+});
+
+/* =========================================================================
+ * 15-1. 백업 내보내기 / 불러오기 (JSON 파일)
+ * ========================================================================= */
+async function exportBackup() {
+  const payload = {
+    type: 'typing-quiz-backup',
+    exportedAt: new Date().toISOString(),
+    customData: CUSTOM_DATA,
+    topicFolders: TOPIC_FOLDERS,
+    createdFolders: CREATED_FOLDERS,
+    wrongNotes: WRONG_NOTES,
+    mindmaps: MINDMAPS
+  };
+  const filename = `typing_quiz_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const file = new File([blob], filename, { type: 'application/json' });
+
+  // 모바일 환경(iOS Safari 등): AirDrop, 카카오톡, 파일 앱으로 바로 공유할 수 있는 공유 시트 지원
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: '퀴즈 백업 파일',
+        text: '타자 퀴즈 백업 파일입니다 (이미지 포함).'
+      });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // 사용자가 공유창 취소함
+    }
+  }
+
+  // 일반 브라우저: 다운로드 처리
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function mergeTopicFoldersInto(target, incoming) {
+  for (const s in incoming) {
+    if (!target[s]) target[s] = {};
+    for (const t in incoming[s]) {
+      target[s][t] = incoming[s][t];
+    }
+  }
+}
+
+function mergeCreatedFoldersInto(target, incoming) {
+  for (const s in incoming) {
+    if (!target[s]) target[s] = [];
+    (incoming[s] || []).forEach(f => {
+      if (f && !target[s].includes(f)) target[s].push(f);
+    });
+  }
+}
+
+function mergeCustomDataInto(target, incoming) {
+  for (const subject in incoming) {
+    if (!target[subject]) target[subject] = {};
+    for (const topic in incoming[subject]) {
+      if (!target[subject][topic]) target[subject][topic] = [];
+      (incoming[subject][topic] || []).forEach(q => {
+        const isDup = target[subject][topic].some(ex => ex.q === q.q && ex.a === q.a && !!ex.img === !!q.img);
+        if (!isDup) {
+          const entry = { id: q.id || genId(), q: q.q, a: q.a };
+          if (q.img) entry.img = q.img;
+          if (q.strict) entry.strict = true;
+          target[subject][topic].push(entry);
+        }
+      });
+    }
+  }
+}
+
+function mergeMindmapsInto(target, incoming) {
+  for (const mapId in incoming) {
+    if (!target[mapId]) {
+      target[mapId] = incoming[mapId];
+    }
+  }
+}
+
+function mergeWrongNotesInto(targetArr, incomingArr) {
+  (incomingArr || []).forEach(note => {
+    let idx = note.id ? targetArr.findIndex(n => n.id === note.id) : -1;
+    if (idx < 0) idx = targetArr.findIndex(n => !n.id && n.subject === note.subject && n.topic === note.topic && n.q === note.q);
+    if (idx >= 0) {
+      targetArr[idx].missCount = Math.max(targetArr[idx].missCount, note.missCount || 1);
+      if (note.img) targetArr[idx].img = note.img;
+      if (note.strict) targetArr[idx].strict = true;
+    } else {
+      const entry = { id: note.id || genId(), subject: note.subject, topic: note.topic, q: note.q, a: note.a, missCount: note.missCount || 1 };
+      if (note.img) entry.img = note.img;
+      if (note.strict) entry.strict = true;
+      targetArr.push(entry);
+    }
+  });
+}
+
+async function importBackupFile(file) {
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') throw new Error('invalid file');
+
+    mergeCustomDataInto(CUSTOM_DATA, parsed.customData || {});
+    mergeTopicFoldersInto(TOPIC_FOLDERS, parsed.topicFolders || {});
+    mergeCreatedFoldersInto(CREATED_FOLDERS, parsed.createdFolders || {});
+    mergeWrongNotesInto(WRONG_NOTES, parsed.wrongNotes || []);
+    mergeMindmapsInto(MINDMAPS, parsed.mindmaps || {});
+
+    await saveCustomData();
+    await saveTopicFolders();
+    await saveCreatedFolders();
+    await saveWrongNotes();
+    await saveMindmaps();
+
+    renderManageList();
+    renderDatalists();
+    renderSubjectGrid();
+    renderWrongBadge();
+
+    alert('백업을 불러왔습니다. 기존 문제에 새 문제가 병합되었습니다.');
+  } catch (e) {
+    alert('백업 파일을 읽는 데 실패했습니다. 올바른 백업 JSON 파일인지 확인해주세요.');
+    console.error(e);
+  }
+}
+
+document.getElementById('btnExportBackup').addEventListener('click', exportBackup);
+document.getElementById('btnImportBackup').addEventListener('click', () => {
+  document.getElementById('importFileInput').click();
+});
+document.getElementById('importFileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) importBackupFile(file);
+  e.target.value = ''; // 같은 파일 다시 선택해도 change 이벤트가 발생하도록 초기화
+});
+
+// 모바일/데스크탑 사진 첨부 파일 선택 핸들러
+const questionImageFileInput = document.getElementById('questionImageFileInput');
+if (questionImageFileInput) {
+  questionImageFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      await loadImageFile(file);
+    }
+    e.target.value = '';
+  });
+}
+
+
+document.getElementById('btnGoManage').addEventListener('click', () => {
+  showScreen(screenManage);
+  renderDatalists();
+  renderManageList();
+});
+document.getElementById('btnManageBack').addEventListener('click', () => {
+  cancelEdit();
+  showScreen(screenSelect);
+  renderSubjectGrid();
+});
+document.getElementById('btnGoWrong').addEventListener('click', () => {
+  showScreen(screenWrong);
+  renderWrongList();
+});
+document.getElementById('btnWrongBack').addEventListener('click', () => {
+  showScreen(screenSelect);
+  renderSubjectGrid();
+});
+btnReviewWrong.addEventListener('click', startWrongReview);
+
+document.getElementById('btnQuit').addEventListener('click', () => {
+  endGame();
+});
+document.getElementById('btnSkip').addEventListener('click', skipQuestion);
+
+// Esc 키: 게임 화면에서 언제든(입력창에 포커스가 있어도) 문제 건너뛰기
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    skipQuestion();
+  }
+});
+
+document.getElementById('btnRestart').addEventListener('click', () => {
+  showScreen(screenSelect);
+  renderSubjectGrid();
+});
+
+/* =========================================================================
+ * 16-1. 이미지 입력 로직 (질문 입력창 드래그&드롭 / Ctrl+V 붙여넣기)
+ *   - 이미지는 Base64로 변환해 currentImgBase64에 저장
+ *   - 미리보기는 #newQuestion textarea 바로 아래 #imgPastePreview에 표시
+ * ========================================================================= */
+let currentImgBase64 = null;
+
+function setDropzoneImage(base64) {
+  currentImgBase64 = base64;
+  const preview = document.getElementById('imgPastePreview');
+  preview.innerHTML = '';
+  preview.classList.remove('hidden');
+
+  const img = document.createElement('img');
+  img.src = base64;
+  img.alt = '미리보기';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'img-paste-remove';
+  removeBtn.title = '이미지 제거';
+  removeBtn.textContent = '✕';
+  removeBtn.onclick = () => clearDropzoneImage();
+
+  preview.appendChild(img);
+  preview.appendChild(removeBtn);
+}
+
+function clearDropzoneImage() {
+  currentImgBase64 = null;
+  const preview = document.getElementById('imgPastePreview');
+  if (preview) { preview.innerHTML = ''; preview.classList.add('hidden'); }
+}
+
+// 이미지 스마트 압축 (최대 1000px, WebP/JPEG 0.8 품질로 변환하여 수 MB를 수십 KB로 최적화)
+function compressImage(file, maxWidth = 1000, maxHeight = 1000, quality = 0.8) {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      resolve(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let compressedDataUrl;
+        try {
+          compressedDataUrl = canvas.toDataURL('image/webp', quality);
+          if (!compressedDataUrl || !compressedDataUrl.startsWith('data:image/webp')) {
+            compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+        } catch (err) {
+          compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(compressedDataUrl || e.target.result);
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const compressed = await compressImage(file);
+  if (compressed) setDropzoneImage(compressed);
+}
+
+// 질문 textarea — 드래그&드롭
+newQuestion.addEventListener('dragover', (e) => {
+  if ([...e.dataTransfer.types].includes('Files')) {
+    e.preventDefault();
+    newQuestion.classList.add('drag-over');
+  }
+});
+newQuestion.addEventListener('dragleave', () => newQuestion.classList.remove('drag-over'));
+newQuestion.addEventListener('drop', async (e) => {
+  newQuestion.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    e.preventDefault();
+    await loadImageFile(file);
+    return;
+  }
+  const items = e.dataTransfer.items;
+  if (items) {
+    for (const item of items) {
+      if (item.type.startsWith('image/')) { e.preventDefault(); await loadImageFile(item.getAsFile()); break; }
+    }
+  }
+});
+
+// 질문 textarea 및 문제 만들기 화면 어디서든 — Ctrl+V / Cmd+V 붙여넣기
+document.addEventListener('paste', async (e) => {
+  if (screenManage.classList.contains('hidden')) return; // 문제 만들기 화면이 아닐 때는 무시
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      await loadImageFile(item.getAsFile());
+      break;
+    }
+  }
+});
+
+/* =========================================================================
+ * 16.5 마인드맵 기능
+ * ========================================================================= */
+
+// 마인드맵 노드 고유 ID 생성
+function genMmId() {
+  return 'n_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+}
+function genMmMapId() {
+  return 'mm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+}
+
+function newMmNode(label, color) {
+  return { id: genMmId(), label: label || '새 노드', color: color || '#38bdf8', children: [], questionIds: [] };
+}
+
+// 트리 안에서 id로 노드 / 부모 찾기 (재귀)
+function findMmNode(root, id) {
+  if (!root) return null;
+  if (root.id === id) return root;
+  for (const c of (root.children || [])) {
+    const found = findMmNode(c, id);
+    if (found) return found;
+  }
+  return null;
+}
+function findMmParent(root, id) {
+  for (const c of (root.children || [])) {
+    if (c.id === id) return root;
+    const found = findMmParent(c, id);
+    if (found) return found;
+  }
+  return null;
+}
+function countMmNodes(node) {
+  return 1 + (node.children || []).reduce((s, c) => s + countMmNodes(c), 0);
+}
+// DFS(전위 순회)로 트리의 모든 노드를 1차원 배열로 펼침
+function flattenMmTree(root) {
+  const out = [];
+  (function walk(n) { out.push(n); (n.children || []).forEach(walk); })(root);
+  return out;
+}
+// 현재 전체 문제(과목/주제)를 하나의 flat 배열로 (subject/topic 정보 포함)
+function getAllQuestionsFlat() {
+  const merged = getMergedData();
+  const all = [];
+  for (const subject in merged) {
+    for (const topic in merged[subject]) {
+      merged[subject][topic].forEach(q => all.push({ ...q, subject, topic }));
+    }
+  }
+  return all;
+}
+
+/* ---- 트리 레이아웃 (간이 Reingold-Tilford: 리프에 순서대로 y슬롯 배정, 부모는 자식 평균) ---- */
+const MM_X_GAP = 170, MM_Y_GAP = 62;
+function computeMmLayout(root) {
+  const positions = {};
+  let leafCounter = 0;
+  function walk(node, depth, parentId) {
+    if (!node.children || node.children.length === 0) {
+      const y = leafCounter * MM_Y_GAP;
+      leafCounter++;
+      positions[node.id] = { x: depth * MM_X_GAP, y, node, parentId };
+      return y;
+    }
+    const childYs = node.children.map(c => walk(c, depth + 1, node.id));
+    const y = (Math.min(...childYs) + Math.max(...childYs)) / 2;
+    positions[node.id] = { x: depth * MM_X_GAP, y, node, parentId };
+    return y;
+  }
+  walk(root, 0, null);
+  return positions;
+}
+
+/* ---- 마인드맵 목록 화면 ---- */
+function renderMmList() {
+  const grid = document.getElementById('mmGrid');
+  grid.innerHTML = '';
+  const maps = Object.values(MINDMAPS).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (maps.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;color:var(--sub);text-align:center;padding:30px 0;font-size:13px;">아직 마인드맵이 없습니다.<br>새로 만들거나 기존 과목을 가져와보세요.</div>';
+    return;
+  }
+  maps.forEach(map => {
+    const card = document.createElement('div');
+    card.className = 'mm-card';
+    card.innerHTML = `
+      <div class="mm-card-title">${map.title}</div>
+      <div class="mm-card-meta">노드 ${countMmNodes(map.root)}개</div>
+      <div class="mm-card-actions">
+        <button class="ghost-btn" data-act="study" style="flex:1;font-size:11px;padding:6px;">▶ 학습</button>
+        <button class="ghost-btn" data-act="del" style="flex:1;font-size:11px;padding:6px;border-color:var(--bad);color:var(--bad);">삭제</button>
+      </div>
+    `;
+    card.querySelector('[data-act="study"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openMmStudyFromList(map.id);
+    });
+    card.querySelector('[data-act="del"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!confirm(`"${map.title}" 마인드맵을 삭제할까요?`)) return;
+      delete MINDMAPS[map.id];
+      saveMindmaps();
+      renderMmList();
+    });
+    card.addEventListener('click', () => openMmEditor(map.id));
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('btnGoMindmap').addEventListener('click', () => {
+  showScreen(screenMindmapList);
+  renderMmList();
+});
+document.getElementById('btnMmListBack').addEventListener('click', () => {
+  showScreen(screenSelect);
+  renderSubjectGrid();
+});
+document.getElementById('btnMmNew').addEventListener('click', () => {
+  const title = prompt('마인드맵 제목(루트 노드 이름)을 입력하세요:');
+  if (!title || !title.trim()) return;
+  const id = genMmMapId();
+  MINDMAPS[id] = { id, title: title.trim(), createdAt: Date.now(), root: newMmNode(title.trim(), '#38bdf8') };
+  saveMindmaps();
+  renderMmList();
+  openMmEditor(id);
+});
+document.getElementById('btnMmImport').addEventListener('click', () => {
+  const subjects = getSubjectList();
+  if (subjects.length === 0) { alert('가져올 과목이 없습니다. 먼저 "문제 만들기"에서 문제를 등록해주세요.'); return; }
+  const listStr = subjects.map((s, i) => `${i + 1}. ${s}`).join('\n');
+  const input = prompt(`마인드맵으로 가져올 과목의 번호를 입력하세요:\n${listStr}`);
+  if (!input) return;
+  const idx = parseInt(input.trim(), 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= subjects.length) { alert('잘못된 번호입니다.'); return; }
+  const subject = subjects[idx];
+  const merged = getMergedData();
+  const root = newMmNode(subject, '#a78bfa');
+  Object.keys(merged[subject] || {}).forEach(topic => {
+    const topicNode = newMmNode(topic, '#38bdf8');
+    topicNode.questionIds = (merged[subject][topic] || []).map(q => q.id).filter(Boolean);
+    root.children.push(topicNode);
+  });
+  const id = genMmMapId();
+  MINDMAPS[id] = { id, title: subject + ' (가져옴)', createdAt: Date.now(), root };
+  saveMindmaps();
+  renderMmList();
+  openMmEditor(id);
+});
+
+/* ---- 마인드맵 에디터 화면 ---- */
+let mmState = { mapId: null, map: null, selectedId: null };
+
+function openMmEditor(mapId) {
+  mmState.mapId = mapId;
+  mmState.map = MINDMAPS[mapId];
+  mmState.selectedId = null;
+  document.getElementById('mmEditTitle').textContent = mmState.map.title;
+  showScreen(screenMindmapEdit);
+  hideMmSideForm();
+  renderMmEditor();
+}
+
+function renderMmEditor() {
+  const svg = document.getElementById('mmSvg');
+  svg.innerHTML = '';
+  if (!mmState.map) return;
+  const positions = computeMmLayout(mmState.map.root);
+  const xs = Object.values(positions).map(p => p.x);
+  const ys = Object.values(positions).map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const pad = 70;
+  svg.setAttribute('viewBox', `${minX - pad} ${minY - pad} ${(maxX - minX) + pad * 2 + 140} ${(maxY - minY) + pad * 2 + 20}`);
+
+  const ns = 'http://www.w3.org/2000/svg';
+  // 연결선(곡선) 먼저 그려서 노드 아래로 깔리게
+  Object.values(positions).forEach(p => {
+    if (!p.parentId) return;
+    const parent = positions[p.parentId];
+    const x1 = parent.x + 66, y1 = parent.y, x2 = p.x - 66, y2 = p.y;
+    const mx = (x1 + x2) / 2;
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('class', 'mm-edge');
+    path.setAttribute('stroke', p.node.color || '#38bdf8');
+    path.setAttribute('stroke-width', '2');
+    svg.appendChild(path);
+  });
+  // 노드
+  Object.values(positions).forEach(p => {
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'mm-node' + (p.node.id === mmState.selectedId ? ' selected' : ''));
+    g.setAttribute('transform', `translate(${p.x},${p.y})`);
+    const label = p.node.label || '(빈 노드)';
+    const w = Math.max(76, label.length * 13 + 30);
+    const rect = document.createElementNS(ns, 'rect');
+    rect.setAttribute('x', -w / 2); rect.setAttribute('y', -18);
+    rect.setAttribute('width', w); rect.setAttribute('height', 36);
+    rect.setAttribute('rx', 10);
+    rect.setAttribute('fill', p.node.color || '#334155');
+    rect.setAttribute('fill-opacity', '0.85');
+    rect.setAttribute('stroke', p.node.color || '#38bdf8');
+    g.appendChild(rect);
+    const text = document.createElementNS(ns, 'text');
+    text.setAttribute('x', 0); text.setAttribute('y', 5);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('fill', '#fff');
+    text.setAttribute('font-size', '13');
+    text.setAttribute('font-weight', '700');
+    text.textContent = label;
+    g.appendChild(text);
+    if (p.node.questionIds && p.node.questionIds.length) {
+      const badge = document.createElementNS(ns, 'circle');
+      badge.setAttribute('cx', w / 2 - 2); badge.setAttribute('cy', -16); badge.setAttribute('r', 8);
+      badge.setAttribute('fill', '#f87171');
+      g.appendChild(badge);
+      const bt = document.createElementNS(ns, 'text');
+      bt.setAttribute('x', w / 2 - 2); bt.setAttribute('y', -12.5);
+      bt.setAttribute('text-anchor', 'middle'); bt.setAttribute('font-size', '9'); bt.setAttribute('fill', '#fff'); bt.setAttribute('font-weight', '700');
+      bt.textContent = p.node.questionIds.length;
+      g.appendChild(bt);
+    }
+    g.addEventListener('click', (e) => { e.stopPropagation(); selectMmNode(p.node.id); });
+    g.addEventListener('dblclick', (e) => { e.stopPropagation(); addMmChild(p.node.id); });
+    svg.appendChild(g);
+  });
+}
+document.getElementById('mmSvg').addEventListener('click', () => {
+  mmState.selectedId = null;
+  renderMmEditor();
+  hideMmSideForm();
+});
+
+function selectMmNode(id) {
+  mmState.selectedId = id;
+  renderMmEditor();
+  showMmSideForm();
+}
+
+function hideMmSideForm() {
+  document.getElementById('mmSidePlaceholder').classList.remove('hidden');
+  document.getElementById('mmSideForm').classList.add('hidden');
+}
+
+function showMmSideForm() {
+  const node = findMmNode(mmState.map.root, mmState.selectedId);
+  if (!node) { hideMmSideForm(); return; }
+  document.getElementById('mmSidePlaceholder').classList.add('hidden');
+  document.getElementById('mmSideForm').classList.remove('hidden');
+  document.getElementById('mmSideFormTitle').textContent = (node.id === mmState.map.root.id) ? '루트 노드 편집' : '노드 편집';
+  document.getElementById('mmNodeLabel').value = node.label || '';
+  document.getElementById('mmNodeColor').value = node.color || '#38bdf8';
+  document.getElementById('btnMmDeleteNode').style.display = (node.id === mmState.map.root.id) ? 'none' : '';
+  renderMmLinkList(node);
+}
+
+function renderMmLinkList(node) {
+  const wrap = document.getElementById('mmLinkList');
+  wrap.innerHTML = '';
+  const all = getAllQuestionsFlat();
+  const linked = (node.questionIds || []).map(qid => all.find(q => q.id === qid)).filter(Boolean);
+  if (linked.length === 0) {
+    wrap.innerHTML = '<div style="color:var(--sub);font-size:11px;">연결된 문제 없음</div>';
+    return;
+  }
+  linked.forEach(q => {
+    const item = document.createElement('div');
+    item.className = 'mm-link-item';
+    const span = document.createElement('span');
+    span.textContent = `${q.q ? q.q : '(이미지 문제)'} → ${q.a}`;
+    item.appendChild(span);
+    const btn = document.createElement('button');
+    btn.className = 'ghost-btn';
+    btn.style.cssText = 'font-size:10px;padding:2px 6px;border-radius:5px;flex-shrink:0;';
+    btn.textContent = '해제';
+    btn.addEventListener('click', () => {
+      node.questionIds = node.questionIds.filter(id => id !== q.id);
+      saveMindmaps();
+      renderMmLinkList(node);
+      renderMmEditor();
+    });
+    item.appendChild(btn);
+    wrap.appendChild(item);
+  });
+}
+
+function addMmChild(parentId) {
+  const parent = findMmNode(mmState.map.root, parentId);
+  if (!parent) return;
+  const child = newMmNode('새 노드', parent.color);
+  if (!parent.children) parent.children = [];
+  parent.children.push(child);
+  mmState.selectedId = child.id;
+  saveMindmaps();
+  renderMmEditor();
+  showMmSideForm();
+  const labelInput = document.getElementById('mmNodeLabel');
+  labelInput.focus();
+  labelInput.select();
+}
+
+function deleteMmNode(id) {
+  if (!mmState.map || id === mmState.map.root.id) return;
+  if (!confirm('이 노드와 하위 노드를 모두 삭제할까요?')) return;
+  const parent = findMmParent(mmState.map.root, id);
+  if (parent) parent.children = parent.children.filter(c => c.id !== id);
+  mmState.selectedId = null;
+  saveMindmaps();
+  renderMmEditor();
+  hideMmSideForm();
+}
+
+document.getElementById('btnMmApplyNode').addEventListener('click', () => {
+  const node = findMmNode(mmState.map.root, mmState.selectedId);
+  if (!node) return;
+  const newLabel = document.getElementById('mmNodeLabel').value.trim();
+  if (newLabel) node.label = newLabel;
+  node.color = document.getElementById('mmNodeColor').value;
+  saveMindmaps();
+  renderMmEditor();
+  showMmSideForm();
+});
+document.getElementById('btnMmAddChild').addEventListener('click', () => {
+  if (mmState.selectedId) addMmChild(mmState.selectedId);
+});
+document.getElementById('btnMmDeleteNode').addEventListener('click', () => {
+  if (mmState.selectedId) deleteMmNode(mmState.selectedId);
+});
+document.getElementById('btnMmEditBack').addEventListener('click', () => {
+  showScreen(screenMindmapList);
+  renderMmList();
+});
+document.getElementById('btnMmEditStudy').addEventListener('click', () => {
+  openMmStudyFromList(mmState.mapId);
+});
+
+/* 문제 연결 모달 */
+document.getElementById('btnMmLinkQ').addEventListener('click', () => {
+  document.getElementById('mmLinkModal').classList.remove('hidden');
+  document.getElementById('mmLinkSearch').value = '';
+  renderMmLinkModalList('');
+});
+document.getElementById('btnMmLinkModalClose').addEventListener('click', () => {
+  document.getElementById('mmLinkModal').classList.add('hidden');
+});
+document.getElementById('mmLinkSearch').addEventListener('input', (e) => renderMmLinkModalList(e.target.value));
+
+function renderMmLinkModalList(filter) {
+  const wrap = document.getElementById('mmLinkModalList');
+  wrap.innerHTML = '';
+  const node = findMmNode(mmState.map.root, mmState.selectedId);
+  if (!node) return;
+  const f = normalize(filter || '');
+  const all = getAllQuestionsFlat();
+  const filtered = f ? all.filter(q => normalize((q.subject || '') + (q.topic || '') + (q.q || '') + q.a).includes(f)) : all;
+  if (filtered.length === 0) {
+    wrap.innerHTML = '<div style="color:var(--sub);font-size:12px;text-align:center;padding:10px 0;">문제가 없습니다.</div>';
+    return;
+  }
+  filtered.slice(0, 200).forEach(q => {
+    const linked = node.questionIds && node.questionIds.includes(q.id);
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:var(--panel-light);border-radius:8px;padding:8px 10px;font-size:12px;gap:8px;';
+    const span = document.createElement('span');
+    span.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    span.textContent = `[${q.subject}/${q.topic}] ${q.q ? q.q : '(이미지 문제)'} → ${q.a}`;
+    item.appendChild(span);
+    const btn = document.createElement('button');
+    btn.className = linked ? 'primary-btn' : 'ghost-btn';
+    btn.style.cssText = 'font-size:11px;padding:5px 10px;flex-shrink:0;';
+    btn.textContent = linked ? '연결됨' : '연결';
+    btn.addEventListener('click', () => {
+      if (!node.questionIds) node.questionIds = [];
+      const idx = node.questionIds.indexOf(q.id);
+      if (idx >= 0) node.questionIds.splice(idx, 1); else node.questionIds.push(q.id);
+      saveMindmaps();
+      renderMmLinkModalList(document.getElementById('mmLinkSearch').value);
+      renderMmLinkList(node);
+      renderMmEditor();
+    });
+    item.appendChild(btn);
+    wrap.appendChild(item);
+  });
+}
+
+/* ---- 마인드맵 학습(암기) 모드 ---- */
+let mmStudy = { list: [], index: 0, includeQuestions: true, mode: 'seq', currentQ: null };
+
+function openMmStudyFromList(mapId) {
+  mmState.mapId = mapId;
+  mmState.map = MINDMAPS[mapId];
+  document.getElementById('mmStudyTitle').textContent = mmState.map.title;
+  document.getElementById('mmStudyModeSelect').classList.remove('hidden');
+  document.getElementById('mmStudyProgress').classList.add('hidden');
+  document.getElementById('mmModeSeq').classList.add('selected');
+  document.getElementById('mmModeRand').classList.remove('selected');
+  showScreen(screenMindmapStudy);
+}
+
+document.getElementById('mmModeSeq').addEventListener('click', () => {
+  document.getElementById('mmModeSeq').classList.add('selected');
+  document.getElementById('mmModeRand').classList.remove('selected');
+});
+document.getElementById('mmModeRand').addEventListener('click', () => {
+  document.getElementById('mmModeRand').classList.add('selected');
+  document.getElementById('mmModeSeq').classList.remove('selected');
+});
+
+document.getElementById('btnMmStudyStart').addEventListener('click', () => {
+  const mode = document.getElementById('mmModeRand').classList.contains('selected') ? 'rand' : 'seq';
+  const includeQuestions = document.getElementById('mmIncludeQuestions').checked;
+  let list = flattenMmTree(mmState.map.root);
+  if (mode === 'rand') list = shuffle(list);
+  mmStudy = { list, index: 0, includeQuestions, mode, currentQ: null };
+  document.getElementById('mmStudyModeSelect').classList.add('hidden');
+  document.getElementById('mmStudyProgress').classList.remove('hidden');
+  renderMmStudyStep();
+});
+document.getElementById('btnMmStudyBack').addEventListener('click', () => {
+  showScreen(screenMindmapList);
+  renderMmList();
+});
+document.getElementById('btnMmStudyPrev').addEventListener('click', () => {
+  if (mmStudy.index > 0) { mmStudy.index--; renderMmStudyStep(); }
+});
+document.getElementById('btnMmStudyNext').addEventListener('click', () => {
+  if (mmStudy.index < mmStudy.list.length - 1) { mmStudy.index++; renderMmStudyStep(); }
+  else { alert('마지막 노드입니다. 수고하셨습니다! 🎉'); }
+});
+
+function renderMmStudyStep() {
+  const node = mmStudy.list[mmStudy.index];
+  document.getElementById('mmStudyCounter').textContent = `${mmStudy.index + 1} / ${mmStudy.list.length}`;
+  document.getElementById('mmStudyMapName').textContent = mmState.map.title;
+  document.getElementById('mmStudyBar').style.width = `${((mmStudy.index + 1) / mmStudy.list.length) * 100}%`;
+  document.getElementById('mmStudyNodeLabel').textContent = node.label;
+  document.getElementById('mmStudyCard').style.borderColor = node.color || 'var(--accent)';
+
+  // 브레드크럼: 루트 → ... → 현재 노드, 각 조상 클릭 시 그 노드로 즉시 이동
+  const chain = [];
+  (function buildChain(n) {
+    chain.unshift(n);
+    const p = findMmParent(mmState.map.root, n.id);
+    if (p) buildChain(p);
+  })(node);
+  const bcWrap = document.getElementById('mmStudyBreadcrumb');
+  bcWrap.innerHTML = '';
+  chain.forEach((n, i) => {
+    if (i > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'bc-sep';
+      sep.textContent = '→';
+      bcWrap.appendChild(sep);
+    }
+    const item = document.createElement('span');
+    item.className = 'bc-item' + (n.id === node.id ? ' current' : '');
+    item.style.cursor = 'pointer';
+    item.textContent = n.label;
+    item.addEventListener('click', () => {
+      const idx = mmStudy.list.findIndex(x => x.id === n.id);
+      if (idx >= 0) { mmStudy.index = idx; renderMmStudyStep(); }
+    });
+    bcWrap.appendChild(item);
+  });
+
+  const subParts = [];
+  if (node.children && node.children.length) subParts.push(`하위 ${node.children.length}개`);
+  if (node.questionIds && node.questionIds.length) subParts.push(`문제 ${node.questionIds.length}개`);
+  document.getElementById('mmStudyNodeSub').textContent = subParts.join(' · ');
+
+  renderMmMinimap(node.id);
+
+  // 연결된 문제(있으면 첫 번째 문제로 즉시 타자 퀴즈 연계)
+  const qWrap = document.getElementById('mmStudyQWrap');
+  const input = document.getElementById('mmStudyQInput');
+  input.value = '';
+  input.classList.remove('correct', 'wrong');
+  document.getElementById('mmStudyQFeedback').textContent = '';
+  mmStudy.currentQ = null;
+  if (mmStudy.includeQuestions && node.questionIds && node.questionIds.length) {
+    const all = getAllQuestionsFlat();
+    const q = all.find(x => x.id === node.questionIds[0]);
+    if (q) {
+      qWrap.classList.remove('hidden');
+      document.getElementById('mmStudyQText').textContent = q.q || '(이미지 문제)';
+      const imgEl = document.getElementById('mmStudyQImg');
+      if (q.img) { imgEl.src = q.img; imgEl.style.display = 'block'; } else { imgEl.style.display = 'none'; }
+      mmStudy.currentQ = q;
+      setTimeout(() => input.focus(), 0);
+    } else {
+      qWrap.classList.add('hidden');
+    }
+  } else {
+    qWrap.classList.add('hidden');
+  }
+}
+
+document.getElementById('mmStudyQInput').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const input = e.target;
+  const q = mmStudy.currentQ;
+  if (!q) return;
+  if (isAnswerCorrect(input.value, q)) {
+    input.classList.remove('wrong'); input.classList.add('correct');
+    document.getElementById('mmStudyQFeedback').innerHTML = '<span style="color:var(--good);">✅ 정답입니다!</span>';
+  } else {
+    input.classList.remove('correct'); input.classList.add('wrong');
+    document.getElementById('mmStudyQFeedback').innerHTML = `<span style="color:var(--bad);">❌ 정답: ${getKeywords(q)[0]}</span>`;
+  }
+});
+
+// 미니맵: 전체 트리를 작게 그려서 현재 위치(어느 가지에서 뻗어나왔는지)를 하이라이트
+function renderMmMinimap(currentId) {
+  const svg = document.getElementById('mmMinimapSvg');
+  svg.innerHTML = '';
+  const positions = computeMmLayout(mmState.map.root);
+  const xs = Object.values(positions).map(p => p.x);
+  const ys = Object.values(positions).map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const pad = 26;
+  svg.setAttribute('viewBox', `${minX - pad} ${minY - pad} ${(maxX - minX) + pad * 2 + 30} ${(maxY - minY) + pad * 2}`);
+  const ns = 'http://www.w3.org/2000/svg';
+  Object.values(positions).forEach(p => {
+    if (!p.parentId) return;
+    const parent = positions[p.parentId];
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', parent.x); line.setAttribute('y1', parent.y);
+    line.setAttribute('x2', p.x); line.setAttribute('y2', p.y);
+    line.setAttribute('stroke', '#334155'); line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(line);
+  });
+  Object.values(positions).forEach(p => {
+    const isCurrent = p.node.id === currentId;
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', p.x); c.setAttribute('cy', p.y);
+    c.setAttribute('r', isCurrent ? 8 : 4);
+    c.setAttribute('fill', isCurrent ? '#fff' : (p.node.color || '#38bdf8'));
+    c.setAttribute('stroke', isCurrent ? (p.node.color || '#38bdf8') : 'none');
+    c.setAttribute('stroke-width', isCurrent ? 3 : 0);
+    svg.appendChild(c);
+  });
+}
+
+/* =========================================================================
+ * 17. 초기화
+ * ========================================================================= */
+async function init() {
+  CUSTOM_DATA = await loadCustomData();
+  TOPIC_FOLDERS = await loadTopicFolders();
+  CREATED_FOLDERS = await loadCreatedFolders();
+  WRONG_NOTES = await loadWrongNotes();
+  MINDMAPS = await loadMindmaps();
+  // 기존 데이터에 고유 id가 없으면 채워넣고 저장 (오답노트 매칭 버그 수정)
+  const idsAdded = backfillQuestionIds(CUSTOM_DATA);
+  if (idsAdded) await saveCustomData();
+  renderWrongBadge();
+  renderSubjectGrid();
+  showScreen(screenSelect);
+}
+init();
+</script>
+</body>
+</html>
