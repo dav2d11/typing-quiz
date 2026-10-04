@@ -422,63 +422,292 @@
   .mm-mode-btn.selected{ border-color:var(--accent); background:rgba(56,189,248,.12); }
   .mm-mode-btn:hover{ border-color:var(--accent); }
 
-  /* ============ 모바일 화면 (iOS / 폰 스케일) 최적화 ============ */
-  @media (max-width: 680px) {
-    body {
-      padding: 12px 8px;
-      padding-top: max(12px, env(safe-area-inset-top));
-      padding-bottom: max(12px, env(safe-area-inset-bottom));
-      padding-left: max(8px, env(safe-area-inset-left));
-      padding-right: max(8px, env(safe-area-inset-right));
-      align-items: flex-start;
-    }
-    .app { width: 100%; max-width: 100%; }
-    h1 { font-size: 22px; margin-bottom: 2px; }
-    .subtitle { font-size: 12px; margin-bottom: 12px; }
-    .panel { padding: 16px 12px; border-radius: 14px; }
+  /* ============ 모바일 전용 앱 (isMobile 감지 시 desktop .app 대체) ============ */
+  #mobileApp {
+    display: none;
+    position: fixed; inset: 0;
+    background: #0a0f1c;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
+  }
+  #mobileApp.active { display: flex; }
 
-    /* iOS Safari 인풋 자동 줌인 방지 (16px 이상 필수) */
-    input[type=text], textarea, select {
-      font-size: 16px !important;
-    }
+  /* 데스크탑에서 #mobileApp 활성화 시 .app 숨김 */
+  body.mobile-mode .app { display: none; }
 
-    /* 상단 액션 버튼 */
-    .top-actions { gap: 6px; margin-bottom: 12px; }
-    .top-actions button { padding: 10px 4px; font-size: 12px; }
+  /* 화면 전환 */
+  .m-screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .m-screen.m-active { display: flex; }
 
-    /* 과목 그리드 - 1열 */
-    .subject-grid { grid-template-columns: 1fr; gap: 8px; }
-    .card-btn { padding: 14px; font-size: 14px; }
+  /* ─── 헤더 ─── */
+  .m-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    background: #1e293b; border-bottom: 1px solid #334155;
+    flex-shrink: 0;
+  }
+  .m-header-title { font-size: 18px; font-weight: 700; color: #e2e8f0; }
+  .m-header-actions { display: flex; gap: 8px; }
+  .m-header-btn {
+    background: #334155; border: none; color: #94a3b8;
+    padding: 7px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    position: relative; touch-action: manipulation;
+  }
+  .m-header-btn.accent { background: rgba(56,189,248,.18); color: #38bdf8; }
 
-    /* 문제 만들기 2분할 -> 모바일 1열 스택 */
-    .manage-layout { flex-direction: column; gap: 16px; }
-    .manage-left { flex: 1 1 auto; width: 100%; }
-    .manage-right {
-      flex: 1 1 auto; width: 100%; max-height: none;
-      border-top: 1px solid var(--panel-light); padding-top: 16px; padding-right: 0;
-    }
+  /* ─── 과목 목록 (홈 화면) ─── */
+  #m-subjectScroll { flex: 1; overflow-y: auto; padding: 10px 10px 80px; }
+  .m-subject-card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+    padding: 16px 14px; font-size: 15px; font-weight: 600; color: #e2e8f0;
+    cursor: pointer; touch-action: manipulation;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .m-subject-card:active { background: #334155; }
+  .m-subject-card .m-sub-count { font-size: 12px; color: #94a3b8; font-weight: 400; }
 
-    /* 터치 버튼 크기 및 간격 */
-    .del-btn, .edit-btn, .order-btn {
-      width: 34px; height: 34px; font-size: 15px;
-    }
-    .acc-q-item { padding: 10px 8px; }
-    .primary-btn { padding: 14px; font-size: 15px; }
+  /* ─── 하단 주제 선택 Bottom Sheet ─── */
+  .m-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 90;
+  }
+  .m-overlay.active { display: block; }
+  .m-bottom-sheet {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: #1e293b; border-top: 1px solid #334155;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column;
+    max-height: 80vh;
+    transform: translateY(100%); transition: transform .28s ease;
+    box-shadow: 0 -10px 40px rgba(0,0,0,.6);
+  }
+  .m-bottom-sheet.open { transform: translateY(0); }
+  .m-sheet-handle {
+    width: 38px; height: 4px; background: #475569; border-radius: 2px;
+    margin: 10px auto 6px;
+  }
+  .m-sheet-subject-name {
+    text-align: center; font-size: 14px; font-weight: 700; color: #38bdf8;
+    padding: 0 16px 8px; border-bottom: 1px solid #334155;
+  }
+  .m-topics-scroll {
+    flex: 1; overflow-y: auto; padding: 10px 12px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
+  }
+  .m-topic-chip {
+    background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    padding: 8px 14px; border-radius: 999px; font-size: 13px; cursor: pointer;
+    touch-action: manipulation; user-select: none;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .m-topic-chip.selected { background: #3b3060; border-color: #a78bfa; color: #fff; font-weight: 700; }
+  .m-sheet-bottom {
+    display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #334155;
+  }
+  .m-sheet-bottom .m-btn-ghost { flex: 1; }
+  .m-sheet-bottom .m-btn-primary { flex: 3; }
 
-    /* 게임 화면 */
-    .target-zone { min-height: 140px; padding: 12px; }
-    .target-word { font-size: 24px; }
-    .answer-input { font-size: 18px; padding: 12px; }
-    .question-img-wrap img { max-height: 38vh; }
-    .game-side-image { flex: 0 0 auto; width: 100%; position: static; margin-bottom: 10px; padding: 6px; }
-    .game-side-image img { max-height: 40vh; }
+  /* ─── 공용 버튼 ─── */
+  .m-btn-primary {
+    padding: 14px; background: linear-gradient(135deg, #38bdf8, #a78bfa);
+    border: none; color: #0f172a; font-weight: 700; font-size: 15px;
+    border-radius: 12px; cursor: pointer; touch-action: manipulation;
+    width: 100%;
+  }
+  .m-btn-primary:active { filter: brightness(.9); }
+  .m-btn-ghost {
+    padding: 11px 14px; background: transparent; border: 1px solid #334155;
+    color: #94a3b8; border-radius: 10px; font-size: 14px; cursor: pointer;
+    touch-action: manipulation; min-height: 44px;
+  }
+  .m-btn-ghost:active { background: #1e293b; }
 
-    /* 마인드맵 에디터 & 학습 모바일 */
-    .mm-grid { grid-template-columns: 1fr; }
-    .mm-editor-wrap { grid-template-columns: 1fr; height: auto; min-height: unset; }
-    .mm-canvas-wrap { height: 320px; }
-    .mm-side { max-height: none; }
-    .mm-study-label { font-size: 22px; }
+  /* ─── 게임 화면 ─── */
+  #m-game { background: #0a0f1c; }
+  .m-game-top {
+    flex-shrink: 0; background: #1e293b;
+    padding: 6px 12px 4px;
+    padding-top: max(6px, env(safe-area-inset-top));
+  }
+  .m-game-hud {
+    display: flex; justify-content: space-between;
+    font-size: 13px; font-weight: 600; color: #94a3b8; margin-bottom: 4px;
+  }
+  .m-timer-outer { height: 4px; background: #334155; border-radius: 99px; overflow: hidden; }
+  .m-timer-inner {
+    height: 100%; background: #38bdf8; width: 100%;
+    transition: width .1s linear;
+  }
+  .m-game-img-area {
+    flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center;
+    padding: 6px 6px 0;
+    min-height: 0;
+  }
+  .m-game-img-area img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    border-radius: 10px; border: 1px solid #334155;
+    cursor: zoom-in;
+    display: block;
+  }
+  .m-game-q-text {
+    flex-shrink: 0; font-size: 17px; font-weight: 600; line-height: 1.5;
+    color: #e2e8f0; text-align: center; padding: 8px 12px 0;
+  }
+  .m-game-q-text.hidden { display: none; }
+  .m-correct-flash { display: none; text-align: center; font-size: 32px; padding: 8px; color: #4ade80; font-weight: 900; }
+  .m-correct-flash.show { display: block; }
+  .m-game-bottom {
+    flex-shrink: 0; padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    background: #1e293b; border-top: 1px solid #334155;
+  }
+  .m-answer-input {
+    width: 100%; padding: 14px 16px; font-size: 18px; border-radius: 12px;
+    border: 2px solid #334155; background: #0f172a; color: #e2e8f0;
+    text-align: center; outline: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .m-answer-input:focus { border-color: #38bdf8; }
+  .m-answer-input.wrong { border-color: #f87171; }
+  .m-strict-hint { font-size: 11px; color: #a78bfa; text-align: center; padding: 3px 0; }
+  .m-game-btns { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .m-game-btns .m-btn-ghost { flex: 1; font-size: 13px; padding: 9px; }
+  .m-game-hint { font-size: 11px; color: #475569; text-align: right; flex: 0; white-space: nowrap; }
+
+  /* ─── 결과 화면 ─── */
+  #m-result { align-items: center; justify-content: center; gap: 12px; padding: 24px; }
+  .m-result-emoji { font-size: 56px; }
+  .m-result-score { font-size: 52px; font-weight: 900; color: #38bdf8; }
+  .m-result-desc { font-size: 14px; color: #94a3b8; text-align: center; }
+  #m-result .m-btn-primary { margin-top: 16px; }
+
+  /* ─── 오답/암기 화면 ─── */
+  .m-list-scroll { flex: 1; overflow-y: auto; padding: 8px 10px; }
+  .m-wrong-item {
+    background: #1e293b; border-radius: 10px; padding: 12px;
+    margin-bottom: 8px; display: flex; gap: 8px; align-items: flex-start;
+  }
+  .m-wrong-badge {
+    background: #f87171; color: #fff; font-size: 11px; font-weight: 700;
+    min-width: 22px; height: 22px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .m-wrong-q { font-size: 13px; color: #e2e8f0; }
+  .m-wrong-a { font-size: 12px; color: #4ade80; margin-top: 3px; }
+  .m-wrong-img { max-width: 50px; max-height: 36px; border-radius: 5px; object-fit: cover; border: 1px solid #334155; cursor: zoom-in; }
+  .m-bottom-bar {
+    flex-shrink: 0; padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    border-top: 1px solid #334155; display: flex; gap: 8px;
+  }
+  .m-bottom-bar .m-btn-ghost { flex: 1; }
+  .m-bottom-bar .m-btn-primary { flex: 2; }
+
+  /* ─── 문제 추가 화면 ─── */
+  .m-manage-scroll { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .m-form-label { font-size: 11px; color: #94a3b8; margin-bottom: 3px; display: block; }
+  .m-form-input {
+    width: 100%; padding: 12px 14px; background: #1e293b; border: 1px solid #334155;
+    color: #e2e8f0; border-radius: 10px; font-size: 16px; outline: none;
+    -webkit-appearance: none;
+  }
+  .m-form-input:focus { border-color: #38bdf8; }
+  .m-form-textarea {
+    width: 100%; padding: 12px 14px; background: #1e293b; border: 1px solid #334155;
+    color: #e2e8f0; border-radius: 10px; font-size: 16px; outline: none;
+    resize: none; min-height: 70px;
+  }
+  .m-img-preview { position: relative; margin-top: 4px; }
+  .m-img-preview img { max-width: 100%; max-height: 120px; border-radius: 8px; object-fit: contain; border: 1px solid #334155; }
+  .m-img-remove {
+    position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.6);
+    border: none; color: #fff; width: 26px; height: 26px; border-radius: 999px;
+    font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .m-strict-toggle {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+    cursor: pointer; touch-action: manipulation;
+  }
+  .m-strict-toggle.active { border-color: #a78bfa; background: rgba(167,139,250,.12); }
+  .m-strict-icon { font-size: 18px; }
+  .m-strict-label { font-size: 13px; color: #94a3b8; }
+  .m-strict-toggle.active .m-strict-label { color: #a78bfa; }
+
+  /* 배지 */
+  #m-wrongBadge {
+    background: #f87171; color: #fff; font-size: 10px; font-weight: 700;
+    min-width: 16px; height: 16px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0 3px;
+  }
+  #m-wrongBadge.hidden { display: none; }
+
+  /* ─── 모바일 보강 스타일 ─── */
+  .m-btn-primary:disabled, .m-btn-ghost:disabled { opacity: .4; }
+  .m-empty { color: #94a3b8; font-size: 13px; text-align: center; padding: 40px 16px; line-height: 1.7; }
+  .m-folder-label {
+    flex: 0 0 100%; font-size: 12px; font-weight: 700; color: #38bdf8;
+    padding: 6px 2px 0; cursor: pointer; touch-action: manipulation; user-select: none;
+  }
+  .m-wrong-body { flex: 1; min-width: 0; }
+  .m-wrong-meta { font-size: 11px; color: #a78bfa; margin-bottom: 3px; }
+  .m-wrong-del {
+    background: transparent; border: 1px solid #f87171; color: #f87171;
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; cursor: pointer;
+    touch-action: manipulation; font-size: 13px;
+  }
+  .m-correct-flash.bad { color: #f87171; font-size: 20px; }
+
+  /* 암기 모드 */
+  .m-mem-dots { display: flex; justify-content: center; gap: 8px; padding: 10px 0 4px; flex-shrink: 0; }
+  .m-mem-dots span {
+    width: 24px; height: 24px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; background: #334155; color: #94a3b8;
+  }
+  .m-mem-dots span.active { background: linear-gradient(135deg, #38bdf8, #a78bfa); color: #0f172a; }
+  .m-mem-dots span.done { background: #4ade80; color: #0f172a; }
+  .m-mem-progress { text-align: center; font-size: 12px; color: #94a3b8; flex-shrink: 0; }
+  .m-mem-body {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  }
+  .m-mem-body img { max-width: 100%; max-height: 40vh; object-fit: contain; border-radius: 10px; border: 1px solid #334155; }
+  .m-mem-q { font-size: 18px; font-weight: 600; color: #e2e8f0; text-align: center; line-height: 1.5; }
+  .m-mem-answer { font-size: 20px; text-align: center; min-height: 28px; }
+  .m-mem-answer .full { color: #4ade80; font-weight: 700; }
+  .m-mem-answer .choseong { color: #a78bfa; font-weight: 700; letter-spacing: 6px; }
+  .m-mem-answer .reveal { color: #4ade80; font-size: 15px; margin-top: 8px; }
+
+  /* 토스트 */
+  #m-toast {
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(10px);
+    background: rgba(30,41,59,.95); border: 1px solid #38bdf8; color: #e2e8f0;
+    padding: 10px 18px; border-radius: 999px; font-size: 13px; z-index: 10000;
+    opacity: 0; pointer-events: none; transition: all .2s ease;
+  }
+  #m-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 모바일 이미지 확대 (핀치 줌 / 더블탭) */
+  #m-lightbox {
+    display: none; position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,.95); align-items: center; justify-content: center;
+    touch-action: none; overflow: hidden;
+  }
+  #m-lightbox.open { display: flex; }
+  #m-lightbox img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    user-select: none; -webkit-user-select: none; -webkit-user-drag: none;
+    transform-origin: center center;
+  }
+  #m-lightboxClose {
+    position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px; z-index: 2;
+    background: rgba(255,255,255,.25); border: none; color: #fff;
+    width: 40px; height: 40px; border-radius: 999px; font-size: 20px; cursor: pointer;
   }
 </style>
 </head>
@@ -763,6 +992,161 @@
       <button class="ghost-btn" id="btnMemBack">← 뒤로</button>
     </div>
   </div>
+
+  <!-- ===================== 7) 전체화면 이미지 확대 모달 (라이트박스) ===================== -->
+  <div id="imageLightboxModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;touch-action:pinch-zoom;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);">
+    <button id="btnCloseLightbox" style="position:absolute;top:max(16px, env(safe-area-inset-top));right:16px;background:rgba(255,255,255,0.25);border:none;color:#fff;width:40px;height:40px;border-radius:999px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10000;">✕</button>
+    <img id="lightboxImg" src="" style="max-width:100%;max-height:92vh;object-fit:contain;border-radius:8px;user-select:none;-webkit-user-select:none;box-shadow:0 8px 30px rgba(0,0,0,0.8);" alt="확대 이미지">
+  </div>
+</div>
+
+<!-- ============================================================
+     모바일 전용 앱 (isMobileDevice() = true 일 때만 활성화)
+     기존 .app 과 완전히 분리된 독립 UI
+     ============================================================ -->
+<div id="mobileApp">
+
+  <!-- 주제 선택 오버레이 -->
+  <div class="m-overlay" id="m-overlay"></div>
+
+  <!-- ── M-홈 화면 ── -->
+  <div class="m-screen m-active" id="m-home">
+    <div class="m-header">
+      <span class="m-header-title">타자 퀴즈</span>
+      <div class="m-header-actions">
+        <button class="m-header-btn" id="m-btn-wrong">오답 <span id="m-wrongBadge" class="hidden">0</span></button>
+        <button class="m-header-btn accent" id="m-btn-manage">✏️ 추가</button>
+      </div>
+    </div>
+    <div id="m-subjectScroll"></div>
+
+    <!-- 주제 Bottom Sheet -->
+    <div class="m-bottom-sheet" id="m-topicSheet">
+      <div class="m-sheet-handle"></div>
+      <div class="m-sheet-subject-name" id="m-sheetSubjectName"></div>
+      <div class="m-topics-scroll" id="m-topicsScroll"></div>
+      <div class="m-sheet-bottom">
+        <button class="m-btn-ghost" id="m-btn-topic-all">전체</button>
+        <button class="m-btn-ghost" id="m-btn-topic-clear">해제</button>
+        <button class="m-btn-primary" id="m-btn-topic-start" disabled>시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── M-게임 화면 ── -->
+  <div class="m-screen" id="m-game">
+    <div class="m-game-top">
+      <div class="m-game-hud">
+        <span id="m-progress">문제 0/0</span>
+        <span id="m-score">점수 0</span>
+      </div>
+      <div class="m-timer-outer"><div class="m-timer-inner" id="m-timerBar"></div></div>
+    </div>
+    <div class="m-game-img-area" id="m-imgArea">
+      <img id="m-questionImg" src="" alt="" style="display:none;">
+    </div>
+    <div class="m-game-q-text hidden" id="m-questionText"></div>
+    <div class="m-correct-flash" id="m-correctFlash">💥 격파!</div>
+    <div class="m-game-bottom">
+      <div class="m-strict-hint hidden" id="m-strictHint">🔀 순서 정확히</div>
+      <input type="text" id="m-answerInput" class="m-answer-input" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+      <div class="m-game-btns">
+        <button class="m-btn-ghost" id="m-btn-quit">종료</button>
+        <button class="m-btn-ghost" id="m-btn-skip">넘기기</button>
+        <span class="m-game-hint" id="m-hint"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── M-결과 화면 ── -->
+  <div class="m-screen" id="m-result">
+    <div class="m-result-emoji">🎯</div>
+    <div class="m-result-score" id="m-resultScore">0점</div>
+    <div class="m-result-desc" id="m-resultDesc"></div>
+    <button class="m-btn-primary" id="m-btn-restart">돌아가기</button>
+  </div>
+
+  <!-- ── M-오답노트 화면 ── -->
+  <div class="m-screen" id="m-wrong">
+    <div class="m-header">
+      <span class="m-header-title">오답노트</span>
+      <button class="m-header-btn" id="m-btn-wrong-back">← 뒤로</button>
+    </div>
+    <div class="m-list-scroll" id="m-wrongList"></div>
+    <div class="m-bottom-bar">
+      <button class="m-btn-ghost" id="m-btn-memorize">암기 모드</button>
+      <button class="m-btn-primary" id="m-btn-review-wrong">다시 풀기</button>
+    </div>
+  </div>
+
+  <!-- ── M-문제 추가 화면 ── -->
+  <div class="m-screen" id="m-manage">
+    <div class="m-header">
+      <span class="m-header-title">문제 추가</span>
+      <button class="m-header-btn" id="m-btn-manage-back">← 뒤로</button>
+    </div>
+    <div class="m-manage-scroll">
+      <div>
+        <label class="m-form-label">과목</label>
+        <input type="text" class="m-form-input" id="m-newSubject" list="m-subjectOptions" placeholder="" autocomplete="off">
+        <datalist id="m-subjectOptions"></datalist>
+      </div>
+      <div>
+        <label class="m-form-label">주제</label>
+        <input type="text" class="m-form-input" id="m-newTopic" list="m-topicOptions" placeholder="" autocomplete="off">
+        <datalist id="m-topicOptions"></datalist>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+          <label class="m-form-label" style="margin:0;">질문</label>
+          <label for="m-imgFileInput" style="font-size:11px;color:#38bdf8;cursor:pointer;">📷 사진</label>
+          <input type="file" id="m-imgFileInput" accept="image/*" style="display:none;">
+        </div>
+        <textarea class="m-form-textarea" id="m-newQuestion" rows="3"></textarea>
+        <div id="m-imgPreview" class="m-img-preview" style="display:none;">
+          <img id="m-imgPreviewImg" src="" alt="">
+          <button class="m-img-remove" id="m-btn-remove-img">✕</button>
+        </div>
+      </div>
+      <div>
+        <label class="m-form-label">정답</label>
+        <input type="text" class="m-form-input" id="m-newAnswer" placeholder="" autocomplete="off">
+      </div>
+      <div class="m-strict-toggle" id="m-strictToggle">
+        <span class="m-strict-icon">🔀</span>
+        <span class="m-strict-label">순서 맞춤 OFF</span>
+      </div>
+    </div>
+    <div class="m-bottom-bar">
+      <button class="m-btn-ghost" id="m-btn-backup">📤 백업</button>
+      <button class="m-btn-ghost" id="m-btn-import">📥 불러오기</button>
+      <input type="file" id="m-importFileInput" accept="application/json,.json" style="display:none;">
+      <button class="m-btn-primary" id="m-btn-add-question" style="flex:2;">문제 추가</button>
+    </div>
+  </div>
+
+  <!-- ── M-암기 모드 화면 ── -->
+  <div class="m-screen" id="m-memorize">
+    <div class="m-header">
+      <span class="m-header-title">암기 모드</span>
+      <button class="m-header-btn" id="m-btn-mem-back">← 뒤로</button>
+    </div>
+    <div class="m-mem-dots"><span id="m-memDot1">1</span><span id="m-memDot2">2</span><span id="m-memDot3">3</span></div>
+    <div class="m-mem-progress" id="m-memProgress"></div>
+    <div class="m-mem-body">
+      <img id="m-memImg" src="" alt="" style="display:none;">
+      <div class="m-mem-q" id="m-memQ"></div>
+      <div class="m-mem-answer" id="m-memAnswer"></div>
+    </div>
+    <div class="m-game-bottom">
+      <input type="text" id="m-memInput" class="m-answer-input" style="display:none;" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+      <div class="m-game-btns">
+        <button class="m-btn-ghost" id="m-btn-mem-reveal">정답 보기</button>
+        <button class="m-btn-primary" id="m-btn-mem-next" style="flex:2;">다음</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -1797,8 +2181,10 @@ function loadQuestion() {
   questionText.textContent = current.q || '';
   if (!current.q) {
     questionText.classList.add('hidden');
+    targetZone.classList.add('no-q-text');
   } else {
     questionText.classList.remove('hidden');
+    targetZone.classList.remove('no-q-text');
   }
 
   renderQuestionImage(current);
@@ -1863,6 +2249,49 @@ function renderQuestionImage(current) {
   };
   probe.src = requestedImg;
 }
+
+/* =========================================================================
+ * 12-2. 전체화면 이미지 확대 모달 (라이트박스)
+ *   - 작은 글씨나 지도를 손가락으로 크게 확대해서 볼 수 있도록 지원
+ * ========================================================================= */
+function openLightbox(src) {
+  if (!src) return;
+  const modal = document.getElementById('imageLightboxModal');
+  const img = document.getElementById('lightboxImg');
+  if (!modal || !img) return;
+  img.src = src;
+  modal.classList.remove('hidden');
+}
+
+function closeLightbox() {
+  const modal = document.getElementById('imageLightboxModal');
+  const img = document.getElementById('lightboxImg');
+  if (modal) modal.classList.add('hidden');
+  if (img) img.src = '';
+}
+
+const btnCloseLightbox = document.getElementById('btnCloseLightbox');
+if (btnCloseLightbox) btnCloseLightbox.addEventListener('click', closeLightbox);
+
+const imageLightboxModal = document.getElementById('imageLightboxModal');
+if (imageLightboxModal) {
+  imageLightboxModal.addEventListener('click', (e) => {
+    if (e.target.id === 'imageLightboxModal' || e.target.id === 'btnCloseLightbox') {
+      closeLightbox();
+    }
+  });
+}
+
+// 퀴즈 문제 이미지 및 암기 카드 이미지 클릭 시 확대 팝업 연결
+['questionImg', 'questionImgSide', 'memImg'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.title = '탭하여 전체화면 확대';
+    el.addEventListener('click', (e) => {
+      if (e.target.src) openLightbox(e.target.src);
+    });
+  }
+});
 
 /* =========================================================================
  * 13. 타이머 로직
@@ -3367,6 +3796,634 @@ function renderMmMinimap(currentId) {
 }
 
 /* =========================================================================
+ * 16.9 모바일 전용 UI 컨트롤러
+ *   - 모바일로 감지되면 기존 .app 대신 #mobileApp 을 띄운다.
+ *   - 게임 엔진(출제/정답판정/오답노트)은 기존 함수를 재사용하고,
+ *     화면/타이머/입력 처리는 모바일 전용으로 독립 동작한다.
+ *   - 테스트용: 주소 뒤에 ?ui=mobile 또는 ?ui=desktop 으로 강제 전환 가능
+ * ========================================================================= */
+const $m = (id) => document.getElementById(id);
+const mobileAppEl = $m('mobileApp');
+
+function isMobileDevice() {
+  const forced = new URLSearchParams(location.search).get('ui');
+  if (forced === 'mobile') return true;
+  if (forced === 'desktop') return false;
+  const ua = navigator.userAgent || '';
+  const phoneUA = /Android.+Mobile|iPhone|iPod|Windows Phone|Mobile Safari/i.test(ua);
+  const narrow = window.matchMedia && window.matchMedia('(max-width: 680px)').matches;
+  return phoneUA || narrow;
+}
+
+let mobActive = false;
+
+/* ---------- 공용 헬퍼 ---------- */
+function mobShow(id) {
+  mobileAppEl.querySelectorAll('.m-screen').forEach(s => s.classList.remove('m-active'));
+  $m(id).classList.add('m-active');
+  mobCloseSheet();
+}
+
+let mobToastTimer = null;
+function mobToast(msg) {
+  let t = $m('m-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'm-toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(mobToastTimer);
+  mobToastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+// 버튼을 눌러도 입력창 포커스(키보드)가 사라지지 않게 한다
+function mobKeepFocus(btn) {
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+}
+
+function mobEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+// 키보드가 올라와도 화면이 가려지지 않도록 보이는 영역(visualViewport)에 맞춘다
+function mobFitViewport() {
+  if (!mobActive) return;
+  const vv = window.visualViewport;
+  if (vv) {
+    mobileAppEl.style.top = vv.offsetTop + 'px';
+    mobileAppEl.style.height = vv.height + 'px';
+    mobileAppEl.style.bottom = 'auto';
+  }
+  if (window.scrollY) window.scrollTo(0, 0);
+}
+function mobResetViewportStyle() {
+  mobileAppEl.style.top = '';
+  mobileAppEl.style.height = '';
+  mobileAppEl.style.bottom = '';
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', mobFitViewport);
+  window.visualViewport.addEventListener('scroll', mobFitViewport);
+}
+
+/* ---------- 이미지 확대 (핀치 줌 / 드래그 / 더블탭) ---------- */
+let mobLightbox = null, mobLightboxImg = null, mobLbReset = () => {};
+function mobSetupLightbox() {
+  mobLightbox = document.createElement('div');
+  mobLightbox.id = 'm-lightbox';
+  mobLightbox.innerHTML = '<button id="m-lightboxClose">✕</button><img id="m-lightboxImg" alt="">';
+  document.body.appendChild(mobLightbox);
+  mobLightboxImg = mobLightbox.querySelector('img');
+
+  let scale = 1, tx = 0, ty = 0;
+  let startDist = 0, startScale = 1, startX = 0, startY = 0, startTx = 0, startTy = 0;
+  let moved = false, lastTap = 0;
+  const apply = () => { mobLightboxImg.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`; };
+  mobLbReset = () => { scale = 1; tx = 0; ty = 0; apply(); };
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+  mobLightbox.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      startDist = dist(e.touches); startScale = scale; moved = true;
+    } else if (e.touches.length === 1) {
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      startTx = tx; startTy = ty; moved = false;
+    }
+  }, { passive: true });
+  mobLightbox.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 2 && startDist > 0) {
+      scale = Math.min(6, Math.max(1, startScale * dist(e.touches) / startDist));
+      if (scale === 1) { tx = 0; ty = 0; }
+      moved = true; apply();
+    } else if (e.touches.length === 1 && scale > 1) {
+      tx = startTx + (e.touches[0].clientX - startX);
+      ty = startTy + (e.touches[0].clientY - startY);
+      moved = true; apply();
+    }
+  }, { passive: false });
+  mobLightbox.addEventListener('touchend', (e) => {
+    if (e.touches.length === 1) { // 핀치 후 손가락 하나가 남으면 드래그 기준점 갱신
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY; startTx = tx; startTy = ty;
+    }
+    if (e.touches.length === 0 && !moved && e.target === mobLightboxImg) {
+      const now = Date.now();
+      if (now - lastTap < 300) { if (scale > 1) mobLbReset(); else { scale = 2.5; tx = 0; ty = 0; apply(); } }
+      lastTap = now;
+    }
+  });
+  mobLightbox.addEventListener('click', (e) => { if (e.target === mobLightbox) mobCloseLightbox(); });
+  $m('m-lightboxClose').addEventListener('click', mobCloseLightbox);
+}
+function mobOpenLightbox(src) {
+  if (!src || !mobLightbox) return;
+  mobLbReset();
+  mobLightboxImg.src = src;
+  mobLightbox.classList.add('open');
+}
+function mobCloseLightbox() {
+  if (!mobLightbox) return;
+  mobLightbox.classList.remove('open');
+  mobLightboxImg.src = '';
+}
+
+/* ---------- 홈 (과목 목록 + 주제 선택 Bottom Sheet) ---------- */
+let mobSubject = null;
+const mobSelectedTopics = new Set();
+
+function mobUpdateBadge() {
+  const b = $m('m-wrongBadge');
+  if (WRONG_NOTES.length > 0) { b.textContent = WRONG_NOTES.length; b.classList.remove('hidden'); }
+  else b.classList.add('hidden');
+}
+
+function mobRenderHome() {
+  mobCloseSheet();
+  mobUpdateBadge();
+  const wrap = $m('m-subjectScroll');
+  wrap.innerHTML = '';
+  const merged = getMergedData();
+  const subjects = Object.keys(merged);
+  if (subjects.length === 0) {
+    wrap.innerHTML = '<div class="m-empty">등록된 문제가 없습니다.<br>오른쪽 위 <b>✏️ 추가</b>에서 문제를 만들거나<br>백업 파일을 불러오세요.</div>';
+    return;
+  }
+  subjects.forEach(subject => {
+    const total = Object.values(merged[subject]).reduce((s, a) => s + a.length, 0);
+    const card = document.createElement('div');
+    card.className = 'm-subject-card';
+    card.innerHTML = `<span>${mobEsc(subject)}</span><span class="m-sub-count">${total}문제 ›</span>`;
+    card.addEventListener('click', () => mobOpenSheet(subject));
+    wrap.appendChild(card);
+  });
+}
+
+function mobOpenSheet(subject) {
+  mobSubject = subject;
+  mobSelectedTopics.clear();
+  $m('m-sheetSubjectName').textContent = subject;
+  mobRenderTopics();
+  $m('m-overlay').classList.add('active');
+  $m('m-topicSheet').classList.add('open');
+}
+function mobCloseSheet() {
+  $m('m-overlay').classList.remove('active');
+  $m('m-topicSheet').classList.remove('open');
+}
+
+function mobRenderTopics() {
+  const scroll = $m('m-topicsScroll');
+  scroll.innerHTML = '';
+  const merged = getMergedData();
+  const topics = Object.keys(merged[mobSubject] || {});
+
+  const folderMap = {};
+  const uncat = [];
+  topics.forEach(t => {
+    const f = getTopicFolder(mobSubject, t);
+    if (f) (folderMap[f] = folderMap[f] || []).push(t); else uncat.push(t);
+  });
+
+  const makeChip = (t) => {
+    const cnt = merged[mobSubject][t].length;
+    const chip = document.createElement('div');
+    chip.className = 'm-topic-chip' + (mobSelectedTopics.has(t) ? ' selected' : '');
+    chip.innerHTML = `<span>${mobEsc(t)}</span><span style="font-size:11px;color:#94a3b8;">${cnt}</span>`;
+    chip.addEventListener('click', () => {
+      if (mobSelectedTopics.has(t)) mobSelectedTopics.delete(t); else mobSelectedTopics.add(t);
+      chip.classList.toggle('selected', mobSelectedTopics.has(t));
+      mobUpdateStartBtn();
+    });
+    return chip;
+  };
+
+  getFolderList(mobSubject).filter(f => folderMap[f] && folderMap[f].length).forEach(f => {
+    const label = document.createElement('div');
+    label.className = 'm-folder-label';
+    label.textContent = `📁 ${f} (${folderMap[f].length}) · 탭하면 폴더 전체 선택`;
+    label.addEventListener('click', () => {
+      const allSel = folderMap[f].every(t => mobSelectedTopics.has(t));
+      folderMap[f].forEach(t => allSel ? mobSelectedTopics.delete(t) : mobSelectedTopics.add(t));
+      mobRenderTopics();
+    });
+    scroll.appendChild(label);
+    folderMap[f].forEach(t => scroll.appendChild(makeChip(t)));
+  });
+
+  if (uncat.length) {
+    if (Object.keys(folderMap).length) {
+      const label = document.createElement('div');
+      label.className = 'm-folder-label';
+      label.style.color = '#94a3b8';
+      label.style.cursor = 'default';
+      label.textContent = '기타';
+      scroll.appendChild(label);
+    }
+    uncat.forEach(t => scroll.appendChild(makeChip(t)));
+  }
+  mobUpdateStartBtn();
+}
+
+function mobUpdateStartBtn() {
+  const btn = $m('m-btn-topic-start');
+  const merged = getMergedData();
+  let total = 0;
+  mobSelectedTopics.forEach(t => { total += (merged[mobSubject] && merged[mobSubject][t]) ? merged[mobSubject][t].length : 0; });
+  btn.disabled = mobSelectedTopics.size === 0;
+  btn.textContent = mobSelectedTopics.size === 0 ? '시작' : `시작 (${total}문제)`;
+}
+
+$m('m-overlay').addEventListener('click', mobCloseSheet);
+$m('m-btn-topic-all').addEventListener('click', () => {
+  const merged = getMergedData();
+  Object.keys(merged[mobSubject] || {}).forEach(t => mobSelectedTopics.add(t));
+  mobRenderTopics();
+});
+$m('m-btn-topic-clear').addEventListener('click', () => { mobSelectedTopics.clear(); mobRenderTopics(); });
+$m('m-btn-topic-start').addEventListener('click', () => {
+  if (mobSelectedTopics.size === 0) return;
+  mobStartGame(mobSubject, Array.from(mobSelectedTopics), 'normal');
+});
+
+$m('m-btn-wrong').addEventListener('click', () => { mobRenderWrong(); mobShow('m-wrong'); });
+$m('m-btn-manage').addEventListener('click', () => { mobRenderDatalists(); mobShow('m-manage'); });
+
+/* ---------- 게임 ---------- */
+const mobGame = {
+  mode: 'normal', subject: '', topic: null,
+  questions: [], index: 0, score: 0,
+  timeLimit: 6, timeLeft: 6, timerId: null, locked: false, advanceId: null
+};
+const mobInput = $m('m-answerInput');
+
+function mobStartGame(subject, topics, mode) {
+  let questions;
+  if (mode === 'wrongReview') questions = buildWrongReviewSet();
+  else questions = buildQuestionSet(subject, topics);
+  if (!questions.length) { alert('출제할 수 있는 문제가 없습니다.'); return; }
+  Object.assign(mobGame, { mode, subject, topic: topics, questions, index: 0, score: 0, locked: false });
+  mobShow('m-game');
+  mobLoadQuestion();
+}
+
+function mobLoadQuestion() {
+  clearInterval(mobGame.timerId);
+  clearTimeout(mobGame.advanceId);
+  if (mobGame.index >= mobGame.questions.length) { mobEndGame(); return; }
+
+  const cur = mobGame.questions[mobGame.index];
+  mobGame.locked = false;
+  mobGame.timeLimit = computeTimeLimit(cur);
+
+  $m('m-progress').textContent = `문제 ${mobGame.index + 1}/${mobGame.questions.length}`;
+  $m('m-score').textContent = `점수 ${mobGame.score}`;
+
+  const qText = $m('m-questionText');
+  qText.textContent = cur.q || '';
+  qText.classList.toggle('hidden', !cur.q);
+
+  const img = $m('m-questionImg');
+  const imgArea = $m('m-imgArea');
+  if (cur.img) {
+    img.src = cur.img; img.style.display = 'block'; imgArea.style.display = 'flex';
+  } else {
+    img.src = ''; img.style.display = 'none'; imgArea.style.display = 'none';
+  }
+
+  $m('m-strictHint').classList.toggle('hidden', !cur.strict);
+  $m('m-correctFlash').classList.remove('show', 'bad');
+  $m('m-hint').textContent = Array.isArray(mobGame.topic) && mobGame.topic.length
+    ? (mobGame.topic.length === 1 ? mobGame.topic[0] : `${mobGame.topic[0]} 외 ${mobGame.topic.length - 1}`)
+    : (mobGame.mode === 'wrongReview' ? '오답노트' : '');
+
+  mobInput.value = '';
+  mobInput.classList.remove('wrong');
+  mobInput.focus(); // 입력창을 비활성화하지 않아 키보드가 계속 유지됨
+  mobStartTimer();
+}
+
+function mobStartTimer() {
+  mobGame.timeLeft = mobGame.timeLimit;
+  mobUpdateTimerBar();
+  mobGame.timerId = setInterval(() => {
+    mobGame.timeLeft -= 0.1;
+    if (mobGame.timeLeft <= 0) {
+      mobGame.timeLeft = 0;
+      mobUpdateTimerBar();
+      clearInterval(mobGame.timerId);
+      mobMarkWrong();
+    } else mobUpdateTimerBar();
+  }, 100);
+}
+function mobUpdateTimerBar() {
+  const ratio = mobGame.timeLeft / mobGame.timeLimit;
+  const bar = $m('m-timerBar');
+  bar.style.width = `${ratio * 100}%`;
+  bar.style.background = ratio < 0.25 ? '#f87171' : (ratio < 0.5 ? '#facc15' : '#38bdf8');
+}
+
+function mobMarkWrong() {
+  if (mobGame.locked) return;
+  mobGame.locked = true;
+  clearInterval(mobGame.timerId);
+  const cur = mobGame.questions[mobGame.index];
+  addToWrongNotes(cur).catch(() => {});
+  const flash = $m('m-correctFlash');
+  flash.textContent = `❌ 정답: ${getKeywords(cur)[0] || cur.a}`;
+  flash.classList.add('show', 'bad');
+  mobGame.advanceId = setTimeout(() => { mobGame.index += 1; mobLoadQuestion(); }, 1100);
+}
+
+function mobHandleCorrect() {
+  if (mobGame.locked) return;
+  mobGame.locked = true;
+  clearInterval(mobGame.timerId);
+  mobGame.score += 1;
+  $m('m-score').textContent = `점수 ${mobGame.score}`;
+  const flash = $m('m-correctFlash');
+  flash.textContent = '💥 격파!';
+  flash.classList.remove('bad');
+  flash.classList.add('show');
+  removeFromWrongNotes(mobGame.questions[mobGame.index]);
+  mobGame.advanceId = setTimeout(() => { mobGame.index += 1; mobLoadQuestion(); }, 450);
+}
+
+mobInput.addEventListener('input', () => {
+  if (mobGame.locked) return;
+  const cur = mobGame.questions[mobGame.index];
+  if (cur && isAnswerCorrect(mobInput.value, cur)) mobHandleCorrect();
+});
+mobInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || mobGame.locked) return;
+  e.preventDefault();
+  const cur = mobGame.questions[mobGame.index];
+  if (cur && !isAnswerCorrect(mobInput.value, cur)) {
+    mobInput.classList.add('wrong');
+    setTimeout(() => mobInput.classList.remove('wrong'), 250);
+  }
+});
+
+function mobEndGame() {
+  clearInterval(mobGame.timerId);
+  clearTimeout(mobGame.advanceId);
+  mobGame.locked = true;
+  mobInput.blur();
+  const total = mobGame.questions.length;
+  $m('m-resultScore').textContent = `${mobGame.score}점`;
+  let desc = mobGame.subject || '';
+  if (mobGame.mode !== 'wrongReview' && Array.isArray(mobGame.topic) && mobGame.topic.length) desc += ` (${mobGame.topic.join(', ')})`;
+  $m('m-resultDesc').textContent = `${desc} · ${total}문제 중 ${mobGame.score}문제 격파`;
+  mobShow('m-result');
+}
+
+['m-btn-quit', 'm-btn-skip'].forEach(id => mobKeepFocus($m(id)));
+$m('m-btn-quit').addEventListener('click', mobEndGame);
+$m('m-btn-skip').addEventListener('click', () => { mobMarkWrong(); mobInput.focus(); });
+$m('m-questionImg').addEventListener('click', (e) => mobOpenLightbox(e.target.src));
+
+$m('m-btn-restart').addEventListener('click', () => {
+  if (mobGame.mode === 'wrongReview') { mobRenderWrong(); mobShow('m-wrong'); }
+  else { mobRenderHome(); mobShow('m-home'); }
+});
+
+/* ---------- 오답노트 ---------- */
+function mobRenderWrong() {
+  mobUpdateBadge();
+  const list = $m('m-wrongList');
+  list.innerHTML = '';
+  $m('m-btn-review-wrong').disabled = WRONG_NOTES.length === 0;
+  $m('m-btn-memorize').disabled = WRONG_NOTES.length === 0;
+  if (WRONG_NOTES.length === 0) {
+    list.innerHTML = '<div class="m-empty">오답노트가 비어 있습니다 🎉</div>';
+    return;
+  }
+  WRONG_NOTES.forEach(note => {
+    const item = document.createElement('div');
+    item.className = 'm-wrong-item';
+    const strict = note.strict ? ' <span style="color:#a78bfa;">· 🔀순서</span>' : '';
+    item.innerHTML = `
+      <div class="m-wrong-badge">${note.missCount || 1}</div>
+      <div class="m-wrong-body">
+        <div class="m-wrong-meta">${mobEsc(note.subject)} · ${mobEsc(note.topic)}</div>
+        <div class="m-wrong-q">${note.q ? mobEsc(note.q) : '<span style="color:#94a3b8;font-style:italic;">(이미지 문제)</span>'}</div>
+        <div class="m-wrong-a">정답: ${mobEsc(note.a)}${strict}</div>
+      </div>`;
+    if (note.img) {
+      const th = document.createElement('img');
+      th.className = 'm-wrong-img';
+      th.src = note.img;
+      th.addEventListener('click', () => mobOpenLightbox(note.img));
+      item.appendChild(th);
+    }
+    const del = document.createElement('button');
+    del.className = 'm-wrong-del';
+    del.textContent = '✕';
+    del.addEventListener('click', async () => { await removeFromWrongNotes(note); mobRenderWrong(); });
+    item.appendChild(del);
+    list.appendChild(item);
+  });
+}
+
+$m('m-btn-wrong-back').addEventListener('click', () => { mobRenderHome(); mobShow('m-home'); });
+$m('m-btn-review-wrong').addEventListener('click', () => {
+  if (WRONG_NOTES.length) mobStartGame('오답노트', null, 'wrongReview');
+});
+$m('m-btn-memorize').addEventListener('click', () => { if (WRONG_NOTES.length) mobStartMemorize(); });
+
+/* ---------- 암기 모드 (1단계 정답 보기 → 2단계 초성 → 3단계 직접 입력) ---------- */
+const mobMem = { items: [], order: [], index: 0, stage: 1 };
+const mobMemInput = $m('m-memInput');
+
+function mobStartMemorize() {
+  mobMem.items = WRONG_NOTES.map(n => ({ ...n }));
+  mobMem.stage = 1;
+  mobMem.index = 0;
+  mobMem.order = shuffle(mobMem.items);
+  mobShow('m-memorize');
+  mobRenderMemCard();
+}
+
+function mobRenderMemCard() {
+  if (mobMem.index >= mobMem.order.length) {
+    if (mobMem.stage < 3) {
+      mobMem.stage += 1; mobMem.index = 0; mobMem.order = shuffle(mobMem.items);
+    } else {
+      mobToast('암기를 완료했습니다 🎉');
+      mobMemInput.blur();
+      mobRenderWrong(); mobShow('m-wrong');
+      return;
+    }
+  }
+  const item = mobMem.order[mobMem.index];
+  const primary = getKeywords(item)[0] || item.a;
+  const last = mobMem.index === mobMem.order.length - 1;
+
+  [1, 2, 3].forEach(s => {
+    const d = $m('m-memDot' + s);
+    d.classList.toggle('active', s === mobMem.stage);
+    d.classList.toggle('done', s < mobMem.stage);
+  });
+  $m('m-memProgress').textContent = `${MEM_STAGE_NAMES[mobMem.stage]} · ${mobMem.index + 1}/${mobMem.order.length}`;
+
+  $m('m-memQ').textContent = item.q || '';
+  const img = $m('m-memImg');
+  if (item.img) { img.src = item.img; img.style.display = 'block'; } else { img.src = ''; img.style.display = 'none'; }
+
+  const ans = $m('m-memAnswer');
+  const reveal = $m('m-btn-mem-reveal');
+  const next = $m('m-btn-mem-next');
+  mobMemInput.value = '';
+  mobMemInput.style.borderColor = '';
+
+  if (mobMem.stage === 1) {
+    ans.innerHTML = `<div class="full">${mobEsc(item.a)}</div>`;
+    mobMemInput.style.display = 'none';
+    reveal.style.display = 'none';
+    next.textContent = last ? '2단계로' : '다음';
+  } else if (mobMem.stage === 2) {
+    ans.innerHTML = `<div class="choseong">${mobEsc(toChoseong(primary))}</div>`;
+    mobMemInput.style.display = 'none';
+    reveal.style.display = '';
+    next.textContent = last ? '3단계로' : '다음';
+  } else {
+    ans.innerHTML = '';
+    mobMemInput.style.display = '';
+    reveal.style.display = '';
+    next.textContent = last ? '완료' : '다음';
+    mobMemInput.focus();
+  }
+}
+
+mobMemInput.addEventListener('input', () => {
+  const item = mobMem.order[mobMem.index];
+  if (item && isAnswerCorrect(mobMemInput.value, item)) {
+    mobMemInput.style.borderColor = '#4ade80';
+    $m('m-memAnswer').innerHTML = `<div class="reveal">✅ 정답: ${mobEsc(item.a)}</div>`;
+  }
+});
+['m-btn-mem-reveal', 'm-btn-mem-next'].forEach(id => mobKeepFocus($m(id)));
+$m('m-btn-mem-reveal').addEventListener('click', () => {
+  const item = mobMem.order[mobMem.index];
+  const ans = $m('m-memAnswer');
+  if (!ans.querySelector('.reveal')) ans.insertAdjacentHTML('beforeend', `<div class="reveal">정답: ${mobEsc(item.a)}</div>`);
+});
+$m('m-btn-mem-next').addEventListener('click', () => { mobMem.index += 1; mobRenderMemCard(); });
+$m('m-btn-mem-back').addEventListener('click', () => { mobMemInput.blur(); mobRenderWrong(); mobShow('m-wrong'); });
+$m('m-memImg').addEventListener('click', (e) => mobOpenLightbox(e.target.src));
+
+/* ---------- 문제 추가 ---------- */
+let mobImgBase64 = null;
+let mobStrict = false;
+
+function mobRenderDatalists() {
+  $m('m-subjectOptions').innerHTML = getSubjectList().map(s => `<option value="${mobEsc(s)}">`).join('');
+  const subj = $m('m-newSubject').value.trim();
+  $m('m-topicOptions').innerHTML = subj ? getTopicList(subj).map(t => `<option value="${mobEsc(t)}">`).join('') : '';
+}
+$m('m-newSubject').addEventListener('input', mobRenderDatalists);
+
+function mobSetImage(b64) {
+  mobImgBase64 = b64;
+  if (b64) { $m('m-imgPreviewImg').src = b64; $m('m-imgPreview').style.display = 'block'; }
+  else { $m('m-imgPreviewImg').src = ''; $m('m-imgPreview').style.display = 'none'; }
+}
+$m('m-imgFileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (file) { const c = await compressImage(file); if (c) mobSetImage(c); }
+  e.target.value = '';
+});
+$m('m-btn-remove-img').addEventListener('click', () => mobSetImage(null));
+
+function mobSetStrict(on) {
+  mobStrict = on;
+  $m('m-strictToggle').classList.toggle('active', on);
+  $m('m-strictToggle').querySelector('.m-strict-label').textContent = on ? '순서 맞춤 ON' : '순서 맞춤 OFF';
+}
+$m('m-strictToggle').addEventListener('click', () => mobSetStrict(!mobStrict));
+
+async function mobSubmitQuestion() {
+  const subject = $m('m-newSubject').value.trim();
+  const topic = $m('m-newTopic').value.trim();
+  const q = $m('m-newQuestion').value.trim();
+  const a = $m('m-newAnswer').value.trim();
+  if (!subject || !topic || !a) { alert('과목, 주제, 정답을 입력해주세요.'); return; }
+  if (!q && !mobImgBase64) { alert('질문 또는 사진을 등록해주세요.'); return; }
+
+  if (!CUSTOM_DATA[subject]) CUSTOM_DATA[subject] = {};
+  if (!CUSTOM_DATA[subject][topic]) CUSTOM_DATA[subject][topic] = [];
+  const entry = { id: genId(), q, a };
+  if (mobImgBase64) entry.img = mobImgBase64;
+  if (mobStrict) entry.strict = true;
+  CUSTOM_DATA[subject][topic].push(entry);
+  await saveCustomData();
+
+  $m('m-newQuestion').value = '';
+  $m('m-newAnswer').value = '';
+  mobSetImage(null);
+  mobSetStrict(false);
+  document.activeElement && document.activeElement.blur();
+  mobRenderDatalists();
+  renderManageList(); renderDatalists(); // 데스크탑 화면 데이터도 동기화
+  mobToast(`추가됨 · ${topic} (${CUSTOM_DATA[subject][topic].length}문제)`);
+}
+mobKeepFocus($m('m-btn-add-question'));
+$m('m-btn-add-question').addEventListener('click', mobSubmitQuestion);
+$m('m-newAnswer').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); mobSubmitQuestion(); }
+});
+
+$m('m-btn-backup').addEventListener('click', exportBackup);
+$m('m-btn-import').addEventListener('click', () => $m('m-importFileInput').click());
+$m('m-importFileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (file) await importBackupFile(file);
+  e.target.value = '';
+  mobRenderDatalists();
+});
+$m('m-btn-manage-back').addEventListener('click', () => {
+  document.activeElement && document.activeElement.blur();
+  mobRenderHome(); mobShow('m-home');
+});
+
+/* ---------- 모바일/데스크탑 전환 ---------- */
+function mobApplyMode() {
+  const want = isMobileDevice();
+  if (want === mobActive) return;
+  mobActive = want;
+  document.body.classList.toggle('mobile-mode', want);
+  mobileAppEl.classList.toggle('active', want);
+  if (want) {
+    mobFitViewport();
+    mobRenderHome();
+    mobShow('m-home');
+  } else {
+    clearInterval(mobGame.timerId);
+    clearTimeout(mobGame.advanceId);
+    mobCloseLightbox();
+    mobResetViewportStyle();
+  }
+}
+
+// 기존 화면 갱신 함수에 모바일 화면 동기화를 덧붙인다 (백업 불러오기, 오답 변경 등)
+(function hookDesktopRenderers() {
+  const origBadge = renderWrongBadge;
+  renderWrongBadge = function () { origBadge(); mobUpdateBadge(); };
+  const origGrid = renderSubjectGrid;
+  renderSubjectGrid = function () {
+    origGrid();
+    if (mobActive && $m('m-home').classList.contains('m-active')) mobRenderHome();
+  };
+})();
+
+function mobInit() {
+  mobSetupLightbox();
+  mobApplyMode();
+  window.addEventListener('resize', () => {
+    // 게임 진행 중에는 전환하지 않음 (키보드 등으로 인한 리사이즈 오작동 방지)
+    if (mobActive && $m('m-game').classList.contains('m-active')) return;
+    mobApplyMode();
+  });
+}
+
+/* =========================================================================
  * 17. 초기화
  * ========================================================================= */
 async function init() {
@@ -3381,6 +4438,7 @@ async function init() {
   renderWrongBadge();
   renderSubjectGrid();
   showScreen(screenSelect);
+  mobInit(); // 모바일 기기로 감지되면 모바일 전용 UI로 전환
 }
 init();
 </script>
