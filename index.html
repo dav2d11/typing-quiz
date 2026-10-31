@@ -507,7 +507,13 @@ mark{background:rgba(242,197,107,.28);color:var(--warn);border-radius:4px;paddin
 <div class="toast" id="toast"></div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
+/* ▼▼ Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 firebaseConfig 값을 여기에 붙여넣으세요 ▼▼ */
+const FB_CONFIG = { apiKey: 'AIzaSyBbA750p1fROMQ4eQY45WVNJNViB6rMAao', authDomain: 'typing-76e07.firebaseapp.com', projectId: 'typing-76e07', storageBucket: 'typing-76e07.firebasestorage.app', messagingSenderId: '1027664567477', appId: '1:1027664567477:web:e06fdd107313c809dcb2fc' };
+/* ▲▲ ------------------------------------------------------------------------ ▲▲ */
 (() => {
 'use strict';
 
@@ -1409,7 +1415,7 @@ const cloud = (() => {
   const hs = s => { let a = 0xdeadbeef, b = 0x41c6ce57; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); a = Math.imul(a ^ c, 2654435761); b = Math.imul(b ^ c, 1597334677); } a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909); b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909); return (4294967296 * (2097151 & b) + (a >>> 0)).toString(36); };
   let P = { q: {}, w: {}, m: '' }, col = {}, mRef = null, live = false, st = 'off', lastOk = 0, errMsg = '';
   const dirty = new Set(); let pushT = 0, retryT = 0, freshT = 0, uiT = 0, pushing = false, gotFresh = false, warned = false;
-  const LBL = { off: '이 기기에만', conn: '연결 중', syncing: '동기화 중', ok: '동기화됨', slow: '연결 지연', err: '동기화 오류' };
+  const LBL = { login: '로그인 필요', off: '이 기기에만', conn: '연결 중', syncing: '동기화 중', ok: '동기화됨', slow: '연결 지연', err: '동기화 오류' };
   function setSt(s, e) {
     st = s; errMsg = e ? (e.message || e.code || '') : '';
     const b = $('#syncBtn'); b.dataset.st = s; $('#syncTxt').textContent = LBL[s];
@@ -1529,8 +1535,42 @@ const cloud = (() => {
   }
   const onErr = e => { console.error('sync', e); setSt('err', e); };
 
+  let unsubs = [], curUid = null, auth = null;
+  function attach(c) {
+    unsubs.forEach(f => f()); unsubs = [];
+    col.q = c.q; col.w = c.w; mRef = c.m; live = true; gotFresh = false;
+    clearTimeout(freshT); freshT = setTimeout(() => { if (!gotFresh) setSt('slow'); }, 10000);
+    unsubs.push(col.q.onSnapshot(s => onSnap('q', s), onErr), col.w.onSnapshot(s => onSnap('w', s), onErr), mRef.onSnapshot(s => onSnap('m', s), onErr));
+  }
+  function startFb() {
+    firebase.initializeApp(FB_CONFIG); auth = firebase.auth(); const fs = firebase.firestore();
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+    setSt('conn');
+    auth.onAuthStateChanged(u => {
+      if (!u) { unsubs.forEach(f => f()); unsubs = []; live = false; curUid = null; return setSt('login'); }
+      if (u.uid === curUid) return; curUid = u.uid; setSt('conn');
+      attach({ q: fs.collection(`users/${u.uid}/questions`), w: fs.collection(`users/${u.uid}/wrongs`), m: fs.doc(`users/${u.uid}/meta/folders`) });
+    });
+  }
+  async function login() {
+    if (!auth) return;
+    const em = await dialog({ title: '로그인', text: '동기화에 쓸 이메일입니다. 처음이면 계정이 자동으로 만들어집니다.', input: { placeholder: '이메일' }, ok: '다음' });
+    if (!em || !em.trim()) return;
+    const pd = dialog({ title: '비밀번호', text: '6자 이상', input: { placeholder: '비밀번호' }, ok: '확인' });
+    $('#dlgInput').type = 'password'; const pw = await pd; $('#dlgInput').type = 'text';
+    if (!pw) return;
+    const e1 = em.trim();
+    try { await auth.signInWithEmailAndPassword(e1, pw); }
+    catch (e) {
+      if (['auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(e.code)) {
+        try { await auth.createUserWithEmailAndPassword(e1, pw); }
+        catch (e2) { toast(e2.code === 'auth/email-already-in-use' ? '비밀번호가 올바르지 않습니다' : '로그인 실패: ' + (e2.code || ''), 'bad'); }
+      } else toast('로그인 실패: ' + (e.code || ''), 'bad');
+    }
+  }
   async function start(saved) {
     if (saved && typeof saved === 'object') P = { q: saved.q || {}, w: saved.w || {}, m: saved.m || '' };
+    if (FB_CONFIG.apiKey && window.firebase) { try { return startFb(); } catch (e) { console.error(e); return setSt('off'); } }
     if (!window.claude?.use) return setSt('off');
     setSt('conn');
     try {
@@ -1538,17 +1578,13 @@ const cloud = (() => {
       const uid = user ? await user.id() : null;
       if (!db || !uid) return setSt('off');
       const root = db.doc('data/users/' + uid + '/profile');
-      col.q = root.collection('questions'); col.w = root.collection('wrongs'); mRef = root.collection('meta').doc('folders');
-      live = true;
-      freshT = setTimeout(() => { if (!gotFresh) setSt('slow'); }, 10000);
-      col.q.onSnapshot(s => onSnap('q', s), onErr);
-      col.w.onSnapshot(s => onSnap('w', s), onErr);
-      mRef.onSnapshot(s => onSnap('m', s), onErr);
+      attach({ q: root.collection('questions'), w: root.collection('wrongs'), m: root.collection('meta').doc('folders') });
     } catch (e) { console.error(e); setSt('off'); }
   }
   function info() {
     const t = lastOk ? new Date(lastOk).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
     return {
+      login: '동기화하려면 로그인하세요. 모든 기기에서 같은 이메일과 비밀번호로 로그인하면 문제, 오답노트, 폴더가 자동으로 동기화됩니다.',
       off: '이 기기에만 저장되고 있습니다. 맥북·아이패드·아이폰 간 동기화는 같은 Claude 계정에 로그인한 상태에서 claude.ai의 앱 링크로 열었을 때 켜집니다.',
       conn: '동기화 서버에 연결하는 중입니다.',
       syncing: '변경 내용을 동기화하고 있습니다.',
@@ -1557,9 +1593,13 @@ const cloud = (() => {
       err: '동기화에 실패했습니다. 잠시 후 자동으로 다시 시도합니다.' + (errMsg ? `\n(${errMsg})` : '')
     }[st];
   }
-  return { start, info, touch: k => { if (live) { dirty.add(k); schedule(); } } };
+  return { start, info, login, logout: () => auth && auth.signOut(), isFb: () => !!auth, state: () => st, touch: k => { if (live) { dirty.add(k); schedule(); } } };
 })();
-$('#syncBtn').onclick = () => dialog({ title: '기기 간 동기화', text: cloud.info(), ok: '확인', cancel: null });
+$('#syncBtn').onclick = async () => {
+  if (cloud.state() === 'login') return cloud.login();
+  if (cloud.isFb()) { if (await dialog({ title: '기기 간 동기화', text: cloud.info(), ok: '로그아웃', cancel: '닫기', danger: true })) cloud.logout(); }
+  else dialog({ title: '기기 간 동기화', text: cloud.info(), ok: '확인', cancel: null });
+};
 
 (async function init() {
   $('#brandImg').src = $('link[rel="apple-touch-icon"]').href;
