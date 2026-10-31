@@ -1498,7 +1498,7 @@ const cloud = (() => {
 
   async function put(ref, o, id, kind) {
     try { await ref.set(o); }
-    catch (e) { if (e?.code === 'invalid_argument') { P[kind][id] = hs(JSON.stringify(o)); if (!warned) { warned = true; toast('용량이 큰 일부 항목은 동기화되지 않았습니다', 'bad'); } } else throw e; }
+    catch (e) { if (e?.code === 'invalid_argument' || e?.code === 'invalid-argument') { P[kind][id] = hs(JSON.stringify(o)); if (!warned) { warned = true; toast('용량이 큰 일부 항목은 동기화되지 않았습니다', 'bad'); } } else throw e; }
   }
   async function pushKind(kind) {
     if (kind === 'm') {
@@ -1507,7 +1507,8 @@ const cloud = (() => {
       return;
     }
     const loc = kind === 'q' ? localQ() : localW(), c = col[kind], Pk = P[kind];
-    for (const [id, l] of loc) if (Pk[id] !== l.h) { await put(c.doc(id), l.o, id, kind); if (Pk[id] === undefined || Pk[id] !== l.h) Pk[id] = l.h; }
+    const todo = [...loc].filter(([id, l]) => Pk[id] !== l.h); let di = 0, dn = 0;
+    await Promise.all(Array.from({ length: 4 }, async () => { while (di < todo.length) { const [id, l] = todo[di++]; await put(c.doc(id), l.o, id, kind); Pk[id] = l.h; dn++; if (todo.length > 3) $('#syncTxt').textContent = `동기화 중 ${dn}/${todo.length}`; } }));
     for (const id of Object.keys(Pk)) if (!loc.has(id)) { await c.doc(id).delete(); delete Pk[id]; }
   }
   function schedule() { clearTimeout(pushT); pushT = setTimeout(push, 1000); }
