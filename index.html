@@ -333,6 +333,32 @@ mark{background:rgba(242,197,107,.28);color:var(--warn);border-radius:4px;paddin
 #s-game.card .timer,#s-game.card .g-time{visibility:hidden}
 .game-card{flex:none;display:flex;gap:10px;padding:10px max(16px,calc((100% - 900px)/2 + 16px));border-top:1px solid var(--line);background:rgba(10,12,16,.72);backdrop-filter:blur(10px)}
 .game-card .btn{flex:1}.game-card .primary{flex:1.6}
+
+/* ---- 단계형 카드 ---- */
+.game-stage.steps{justify-content:flex-start;overflow-y:auto;padding-top:10px;padding-bottom:18px}
+.game-stage.steps .g-q{flex:none;font-size:clamp(19px,3vw,26px);line-height:1.4}
+.st{flex:none;width:100%;max-width:560px;display:flex;flex-direction:column;gap:12px;margin:auto 0}
+.st-modes button{height:34px;font-size:13px}
+.st-rows{display:flex;flex-direction:column;gap:6px}
+.st-row{display:flex;align-items:center;gap:12px;min-height:46px;padding:8px 14px;border-radius:13px;background:var(--s1);border:1px solid var(--line);font-size:17px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;transition:border-color .15s,background .15s,color .15s}
+.st-row span{flex:1;min-width:0;text-align:left}
+.st-row b{flex:none;width:24px;height:24px;border-radius:99px;background:var(--s3);color:var(--sub);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.st-row .ph{color:var(--mute);font-weight:500;font-size:14px}
+.st-row.cur{border-color:var(--accent);background:var(--accent-soft)}
+.st-row.cur b{background:var(--accent);color:#0a0c10}
+.st-row.ok{border-color:rgba(95,211,160,.4);color:var(--good)}
+.st-row.ok b{background:rgba(95,211,160,.2);color:var(--good)}
+.st-row.miss{border-color:rgba(255,123,139,.42);color:var(--bad)}
+.st-row.miss b{background:rgba(255,123,139,.18);color:var(--bad)}
+.st-pool{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.st-chip{padding:11px 16px;border-radius:12px;background:var(--s2);border:1px solid var(--line2);font-size:16px;font-weight:620;transition:border-color .15s,background .15s}
+.st-chip:hover{border-color:var(--accent)}
+.st-chip.bad{animation:shake .25s;border-color:var(--bad);color:var(--bad)}
+.st-in{width:100%;height:48px;padding:0 14px;border-radius:13px;border:1px solid var(--line2);background:var(--s1);font-size:17px;font-weight:600;outline:none;transition:border-color .15s}
+.st-in:focus{border-color:var(--accent)}
+.st-in.bad{animation:shake .25s;border-color:var(--bad)}
+.st-act{display:flex;gap:10px}.st-act .btn{flex:1}.st-act .primary{flex:1.6}
+.st-note{margin-top:6px;font-size:12px;line-height:1.5;color:var(--accent);overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -395,6 +421,13 @@ mark{background:rgba(242,197,107,.28);color:var(--warn);border-radius:4px;paddin
   <div class="game-stage" id="gStage">
     <div class="g-img" id="gImgBox" hidden><img class="zoom" id="gImg" alt=""></div>
     <div class="g-q" id="gQ"></div>
+    <div class="st" id="gSteps" hidden>
+      <div class="seg st-modes" id="stModes"><button type="button" data-m="order">순서 맞추기</button><button type="button" data-m="recall">떠올리기</button><button type="button" data-m="write">직접 쓰기</button></div>
+      <div class="st-rows" id="stRows"></div>
+      <input class="st-in" id="stIn" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" hidden>
+      <div class="st-pool" id="stPool"></div>
+      <div class="st-act" id="stAct"></div>
+    </div>
     <div class="g-flash" id="gFlash"></div>
   </div>
   <div class="game-input">
@@ -474,7 +507,7 @@ mark{background:rgba(242,197,107,.28);color:var(--warn);border-radius:4px;paddin
         <textarea class="inp" id="mQ" rows="3"></textarea>
         <div class="prev" id="mPrev" hidden><img id="mPrevImg" alt=""><button class="mini sq" id="mPrevRm" type="button" aria-label="사진 삭제"><i data-i="x"></i></button></div>
       </div>
-      <div class="field"><div class="field-row"><span id="mAL">정답</span><button class="mini sq" id="mBoldA" type="button" aria-label="볼드" hidden><b>B</b></button></div><textarea class="inp" id="mA" rows="1" autocomplete="off"></textarea></div>
+      <div class="field"><div class="field-row"><span id="mAL">정답</span><button class="mini sq" id="mBoldA" type="button" aria-label="볼드" hidden><b>B</b></button></div><textarea class="inp" id="mA" rows="1" autocomplete="off"></textarea><div class="st-note" id="mStNote" hidden></div></div>
       <button class="sw-row" id="mStrict" type="button" aria-pressed="false"><span class="sw-l"><i data-i="order"></i>정답 순서 맞춤</span><span class="sw"></span></button>
       <button class="btn primary block" id="mAdd" type="button">문제 추가</button>
     </div>
@@ -559,7 +592,7 @@ mark{background:rgba(242,197,107,.28);color:var(--warn);border-radius:4px;paddin
         <button class="btn sm" id="eRm" type="button" hidden><i data-i="trash"></i>사진 삭제</button>
         <input type="file" id="eFile" accept="image/*" hidden>
       </div>
-      <div class="field"><div class="field-row"><span id="eAL">정답</span><button class="mini sq" id="eBoldA" type="button" aria-label="볼드" hidden><b>B</b></button></div><textarea class="inp" id="eA" rows="1" autocomplete="off"></textarea></div>
+      <div class="field"><div class="field-row"><span id="eAL">정답</span><button class="mini sq" id="eBoldA" type="button" aria-label="볼드" hidden><b>B</b></button></div><textarea class="inp" id="eA" rows="1" autocomplete="off"></textarea><div class="st-note" id="eStNote" hidden></div></div>
       <button class="sw-row" id="eStrict" type="button" aria-pressed="false"><span class="sw-l"><i data-i="order"></i>정답 순서 맞춤</span><span class="sw"></span></button>
     </div>
     <div class="sheet-foot"><button class="btn" id="eNo">취소</button><button class="btn primary" id="eOk">저장</button></div>
@@ -626,6 +659,28 @@ const isOpen = el => el.classList.contains('open');
 const sw = (el, v) => { if (v === undefined) v = el.getAttribute('aria-pressed') !== 'true'; el.setAttribute('aria-pressed', v); return v; };
 const keepFocus = el => el.addEventListener('mousedown', e => e.preventDefault());
 const hydrate = (root, sel, get) => $$(sel, root).forEach(im => { const v = get(im); if (v) im.src = v; });
+
+/* 한글 입력기 '유령 글자' 방지.
+ * 값을 비워도 IME가 조합 중이던 마지막 글자를 다음 입력 때 되살리는 경우가 있다.
+ *  - ghostArm: 입력창을 비우기 직전에 마지막 글자를 기억해 둔다.
+ *  - ghostCheck: 비운 뒤 첫 input 이벤트를 검사한다.
+ *      · 키를 누르지 않았는데 글자가 생겼다 → 유령이므로 제거
+ *      · 첫 입력인데 2글자 이상이고 맨 앞이 기억해 둔 글자다 → 앞 글자만 제거
+ *    true를 반환하면 이 이벤트는 정답 판정을 하지 않는다. */
+const newGhost = () => ({ ch: '', armed: false, key: false });
+function ghostArm(gh, el) {
+  const v = el ? el.value : '';
+  gh.ch = v ? v.slice(-1) : ''; gh.armed = !!gh.ch; gh.key = false;
+}
+function ghostKey(gh) { gh.key = true; }
+function ghostCheck(gh, el) {
+  if (!gh.armed) return false;
+  if (!el.value) return false;
+  if (!gh.key) { el.value = ''; return true; }
+  gh.armed = false;
+  if (el.value.length > 1 && el.value[0] === gh.ch) { el.value = el.value.slice(1); }
+  return false;
+}
 
 /* =========================================================================
  * 저장소 (IndexedDB 우선, window.storage / localStorage 폴백) - 키 호환 유지
@@ -1093,10 +1148,10 @@ function loadQ() {
   stopT(); clearTimeout(G.adv);
   if (G.i >= G.qs.length) return endGame();
   const q = G.qs[G.i];
-  const card = q.type === 'card';
+  const card = q.type === 'card', steps = card ? stepsOf(q) : null;
   G.locked = false; G.flashing = false; G.flipped = false; G.limit = timeLimit(q);
   $('#s-game').classList.toggle('card', card);
-  $('.game-input').hidden = card; $('#gCard').hidden = !card;
+  $('.game-input').hidden = card; $('#gCard').hidden = !card || !!steps; $('#gSteps').hidden = !steps; gStage.classList.toggle('steps', !!steps);
   $('#gFlip').hidden = false; $('#gAgain').hidden = $('#gKnow').hidden = true;
   $('#gProg').textContent = `${G.i + 1} / ${G.qs.length}`;
   $('#gScore').textContent = G.score;
@@ -1105,8 +1160,9 @@ function loadQ() {
   gStage.classList.toggle('text-only', !q.img); gStage.classList.remove('hit');
   if (q.img) { gImg.src = q.img; $('#gImgBox').hidden = false; } else { gImg.removeAttribute('src'); $('#gImgBox').hidden = true; }
   gFlash.className = 'g-flash'; gTop.classList.remove('urgent');
-  gInput.value = ''; gInput.className = '';
+  ghostArm(gGhost, gInput); gInput.value = ''; gInput.className = '';
   if (card) gInput.blur(); else { gInput.focus(); startT(); }
+  if (steps) stInit(q, steps); else ST.q = null;
   setTimeout(() => preload(G.qs[G.i + 1]), 80);
 }
 const next = () => { clearTimeout(G.adv); G.i++; loadQ(); };
@@ -1146,16 +1202,19 @@ $('#gKnow').onclick = () => cardDone(true);
 $('#gAgain').onclick = () => cardDone(false);
 function skip() {
   if (cur !== 'game') return;
-  if (G.qs[G.i]?.type === 'card') { flip(); return; }
+  if (G.qs[G.i]?.type === 'card') { if (ST.q) stGiveUp(); else flip(); return; }
   if (G.locked) { if (G.flashing) next(); return; }
   markWrong();
 }
+const gGhost = newGhost();
 gInput.addEventListener('input', () => {
   if (G.locked) return;
+  if (ghostCheck(gGhost, gInput)) return;
   const q = G.qs[G.i];
   if (q && isCorrect(gInput.value, q)) hit();
 });
 gInput.addEventListener('keydown', e => {
+  ghostKey(gGhost);
   if (e.key !== 'Enter') return;
   e.preventDefault();
   if (G.locked) { if (G.flashing) next(); return; }
@@ -1165,6 +1224,178 @@ gInput.addEventListener('keydown', e => {
 keepFocus($('#gSkip'));
 $('#gSkip').onclick = () => { skip(); if (cur === 'game') gInput.focus(); };
 $('#gQuit').onclick = () => endGame();
+
+/* =========================================================================
+ * 단계형 카드: 카드 정답이 "1 … 2 … 3 …" 번호 목록이면 자동으로 단계형으로 인식
+ *  - 줄바꿈으로 번호를 나눠 쓰면 가장 정확합니다. 한 줄이면 1,2,3… 순서대로 이어지는 번호를 기준으로 나눕니다.
+ * ========================================================================= */
+const stCache = new WeakMap();
+function parseSteps(a) {
+  const raw = String(a || '').replace(/\r/g, '').trim();
+  if (!raw) return null;
+  const lines = raw.split('\n');
+  const lineMode = lines.filter(l => /^\s*\d+(?:[.)\]:]|\s|$)/.test(l)).length >= 2;
+  const out = []; let k = 1, bad = false;
+  for (const l of lines) {
+    l.trim().split(/\s+/).filter(Boolean).forEach((w, j) => {
+      const head = !lineMode || j === 0; let m;
+      if (head && (m = w.match(/^(\d+)[.)\]:]?$/)) && +m[1] === k) { out.push(''); k++; return; }
+      if (lineMode && j === 0 && (m = w.match(/^(\d+)[.)\]:](.+)$/)) && +m[1] === k) { out.push(m[2]); k++; return; }
+      if (!out.length) { bad = true; return; }
+      out[out.length - 1] += (out[out.length - 1] ? ' ' : '') + w;
+    });
+  }
+  if (bad || out.length < 2 || out.some(x => !x.trim())) return null;
+  return out.map(x => x.trim());
+}
+function stepsOf(q) {
+  if (!q || q.type !== 'card') return null;
+  const c = stCache.get(q); if (c && c.a === q.a) return c.s;
+  const s = parseSteps(q.a); stCache.set(q, { a: q.a, s }); return s;
+}
+function stNote(p) {
+  const el = $('#' + p + 'StNote'), a = $('#' + p + 'A'); if (!el || !a) return;
+  const t = $('#' + p + 'Type .on')?.dataset.type, s = t === 'card' ? parseSteps(a.value) : null;
+  el.hidden = !s;
+  if (s) el.textContent = `${s.length}단계 · ` + s.map(x => x.length > 14 ? x.slice(0, 13) + '…' : x).join(' › ');
+}
+['m', 'e'].forEach(p => $('#' + p + 'A').addEventListener('input', () => stNote(p)));
+
+let stMode = 'order';
+try { const m = localStorage.getItem('stMode'); if (['order', 'recall', 'write'].includes(m)) stMode = m; } catch {}
+const ST = { q: null, steps: [], eff: 'order', k: 0, miss: 0, done: false, auto: false, reveal: false, shown: false, missed: new Set(), pool: [], logged: false };
+const stBox = $('#gSteps'), stRows = $('#stRows'), stPool = $('#stPool'), stAct = $('#stAct'), stModes = $('#stModes');
+let stIn = $('#stIn');
+const stJudge = (raw, t) => isCorrect(raw, { a: t.replace(/\*\*/g, ''), strict: false });
+/* 한글 입력기는 '조합 중인 마지막 글자'를 따로 들고 있어서, 값만 비우면 다음 입력 때 그 글자가 되살아난다.
+ *  - 데스크톱(Safari 등): 포커스를 잃게 해 조합을 확정시키고 → 비우고 → 잠시 뒤 포커스를 되돌린다.
+ *    그 사이에 발생하는 입력/조합 이벤트는 무시한다.
+ *  - 터치 기기: 키보드가 내려가지 않도록 입력창을 새것으로 교체한다. */
+const stTouch = matchMedia('(pointer:coarse)').matches;
+let stBusy = false, stBusyT = 0;
+const stGhost = newGhost();
+function stOnInput() {
+  if (stBusy) return;
+  if (ghostCheck(stGhost, stIn)) return;
+  if (ST.q && !ST.done && ST.eff === 'write' && stJudge(stIn.value, ST.steps[ST.k])) stWrite(true);
+}
+function stBind(el) {
+  el.addEventListener('input', stOnInput);
+  el.addEventListener('keydown', () => ghostKey(stGhost));
+  el.addEventListener('compositionend', () => { if (stBusy) el.value = ''; });
+}
+function stClear() {
+  ghostArm(stGhost, stIn);
+  if (stTouch) {
+    const n = stIn.cloneNode(false);
+    n.value = ''; n.classList.remove('bad');
+    stIn.replaceWith(n); stIn = n; stBind(n);
+    return;
+  }
+  stBusy = true; clearTimeout(stBusyT);
+  stIn.blur(); stIn.value = '';
+  stBusyT = setTimeout(() => {
+    stIn.value = ''; stBusy = false;
+    if (!stIn.hidden) stIn.focus({ preventScroll: true });
+  }, 60);
+}
+const stShake = el => { el.classList.remove('bad'); void el.offsetWidth; el.classList.add('bad'); };
+
+function stInit(q, steps) {
+  const same = ST.q === q;
+  Object.assign(ST, { q, steps, eff: stMode, k: 0, miss: 0, done: false, auto: false, reveal: false, shown: false, missed: new Set(), pool: [], logged: same && ST.logged });
+  if (stMode === 'order') {
+    const base = steps.map(t => ({ t, used: false })); const sh = shuffle(base);
+    if (steps.length > 1 && sh.every((x, i) => x === base[i])) sh.reverse();
+    ST.pool = sh;
+  }
+  ghostArm(stGhost, stIn); stIn.value = ''; stIn.classList.remove('bad');
+  stRender();
+}
+/* 틀리는 즉시 오답노트에 기록 (중간에 나가거나 모드를 바꿔도 유지) */
+function stMistake() { if (ST.q && !ST.logged) { ST.logged = true; addWrong(ST.q); } }
+function stRender() {
+  const n = ST.steps.length, m = ST.eff;
+  const row = (i, c, h) => `<div class="st-row ${c}"><b>${i + 1}</b><span>${h}</span></div>`;
+  let rows = '', pool = '', act = '';
+  stModes.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === stMode));
+  if (m === 'order') {
+    for (let i = 0; i < n; i++) rows += i < ST.k ? row(i, 'ok', fmt(ST.steps[i])) : ST.reveal ? row(i, 'miss', fmt(ST.steps[i])) : row(i, i === ST.k ? 'cur' : '', '');
+    if (!ST.done) pool = ST.pool.map((p, j) => p.used ? '' : `<button class="st-chip" data-p="${j}">${fmt(p.t)}</button>`).join('');
+  } else {
+    for (let i = 0; i < n; i++) {
+      if (ST.reveal && i >= ST.k) rows += row(i, 'miss', fmt(ST.steps[i]));
+      else if (i < ST.k) rows += row(i, ST.missed.has(i) ? 'miss' : 'ok', fmt(ST.steps[i]));
+      else if (i === ST.k) rows += row(i, 'cur', m === 'recall' && ST.shown ? fmt(ST.steps[i]) : '');
+      else rows += row(i, '', '');
+    }
+    if (!ST.done) {
+      if (m === 'recall') act = ST.shown ? '<button class="btn" data-a="miss">놓침</button><button class="btn primary" data-a="hit">맞음</button>' : '<button class="btn primary" data-a="show">공개</button>';
+      else act = '<button class="btn" data-a="skip">모름</button>';
+    }
+  }
+  if (ST.done && !ST.auto) act = '<button class="btn primary" data-a="next">다음</button>';
+  stRows.innerHTML = rows; stPool.innerHTML = pool; stAct.innerHTML = act;
+  const wr = m === 'write' && !ST.done;
+  stIn.hidden = !wr;
+  if (wr) { if (!stBusy) stIn.focus({ preventScroll: true }); } else stIn.blur();
+}
+function stFinish(known) {
+  if (ST.done) return;
+  known = known && !ST.logged;
+  ST.done = true; ST.auto = known; G.locked = true;
+  const q = ST.q;
+  if (known) { G.score++; $('#gScore').textContent = G.score; removeWrong(q); } else stMistake();
+  stRender();
+  if (known) G.adv = setTimeout(next, 750);
+}
+function stGiveUp() {
+  if (!ST.q) return;
+  if (ST.done) { clearTimeout(G.adv); next(); return; }
+  ST.reveal = true;
+  stFinish(false);
+}
+function stWrite(ok) {
+  if (ST.done || ST.eff !== 'write') return;
+  if (!ok) { ST.missed.add(ST.k); ST.miss++; stMistake(); }
+  ST.k++; stClear();
+  if (ST.k >= ST.steps.length) stFinish(!ST.missed.size); else stRender();
+}
+function stAction(a) {
+  if (a === 'next') { clearTimeout(G.adv); next(); return; }
+  if (!ST.q || ST.done) return;
+  if (a === 'show') { ST.shown = true; stRender(); }
+  else if (a === 'skip') stWrite(false);
+  else if (a === 'hit' || a === 'miss') {
+    if (!ST.shown) return;
+    if (a === 'miss') { ST.missed.add(ST.k); stMistake(); }
+    ST.k++; ST.shown = false;
+    if (ST.k >= ST.steps.length) stFinish(!ST.missed.size); else stRender();
+  }
+}
+function stEnter() {
+  if (ST.done) { clearTimeout(G.adv); next(); return; }
+  if (ST.eff === 'recall') stAction(ST.shown ? 'hit' : 'show');
+  else if (ST.eff === 'write') {
+    if (!stIn.value.trim()) { stShake(stIn); return; }
+    stWrite(stJudge(stIn.value, ST.steps[ST.k]));
+  }
+}
+stBox.addEventListener('animationend', e => e.target.classList.remove('bad'));
+stBind(stIn);
+stBox.addEventListener('click', e => {
+  const ab = e.target.closest('[data-a]');
+  if (ab) { stAction(ab.dataset.a); return; }
+  const mb = e.target.closest('[data-m]');
+  if (mb) { if (!ST.q || ST.done) return; stMode = mb.dataset.m; try { localStorage.setItem('stMode', stMode); } catch {} stInit(ST.q, ST.steps); return; }
+  if (!ST.q || ST.done) return;
+  const chip = e.target.closest('[data-p]');
+  if (chip) {
+    const p = ST.pool[+chip.dataset.p]; if (!p || p.used) return;
+    if (p.t === ST.steps[ST.k]) { p.used = true; ST.k++; if (ST.k >= ST.steps.length) stFinish(ST.miss === 0); else stRender(); }
+    else { ST.miss++; stMistake(); stShake(chip); }
+  }
+});
 
 function endGame() {
   stopT(); clearTimeout(G.adv); G.locked = true; flush(); gInput.blur();
@@ -1243,6 +1474,7 @@ function typeUI(seg, p, t) {
   $('#' + p + 'AL').textContent = c ? '뒷면' : '정답';
   a.classList.toggle('multi', c); a.rows = c ? 4 : 1;
   $('#' + p + 'Strict').hidden = c; $('#' + p + 'BoldA').hidden = !c;
+  stNote(p);
 }
 function boldSel(el) {
   let a = el.selectionStart, b = el.selectionEnd; const v = el.value;
@@ -1344,7 +1576,7 @@ function addQuestion() {
   const e = { id: genId(), q, a }; if (mImg) e.img = mImg; if (card) e.type = 'card'; else if (mStrict) e.strict = true;
   ((D[s] ??= {})[t] ??= []).push(e);
   save.data();
-  $('#mQ').value = ''; $('#mA').value = ''; setMImg(null); mStrict = sw($('#mStrict'), false);
+  $('#mQ').value = ''; $('#mA').value = ''; stNote('m'); setMImg(null); mStrict = sw($('#mStrict'), false);
   openSec.add(kS(s)); openSec.add(kT(s, t));
   renderManage(); datalists();
   toast(`추가됨 · ${t} (${D[s][t].length})`);
@@ -1539,11 +1771,6 @@ async function exportBackup(sel, withWrong) {
   const payload = { type: 'typing-quiz-backup', exportedAt: new Date().toISOString(), customData: cd, topicFolders: tf, createdFolders: cf, wrongNotes: wn };
   const name = `typing_quiz_${partial ? 'part' : 'backup'}_${new Date().toISOString().slice(0, 10)}.json`;
   const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-  const file = new File([blob], name, { type: 'application/json' });
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: '퀴즈 백업' }); return; }
-    catch (err) { if (err.name === 'AbortError') return; }
-  }
   const url = URL.createObjectURL(blob), a = Object.assign(document.createElement('a'), { href: url, download: name });
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -1631,7 +1858,7 @@ document.addEventListener('click', e => {
 });
 addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyO' && cur === 'manage') { e.preventDefault(); mStrict = sw($('#mStrict')); return; }
-  if (e.key === 'Enter' && cur === 'game' && G.qs[G.i]?.type === 'card' && !isOpen($('#dlgLayer'))) { e.preventDefault(); G.flipped ? cardDone(true) : flip(); return; }
+  if (e.key === 'Enter' && cur === 'game' && G.qs[G.i]?.type === 'card' && !isOpen($('#dlgLayer'))) { e.preventDefault(); if (ST.q) stEnter(); else G.flipped ? cardDone(true) : flip(); return; }
   if (e.key !== 'Escape') return;
   const order = [['dlgLayer', dlgCancel], ['lb', closeLb], ['qeLayer', closeEditor], ['exLayer', () => closeL($('#exLayer'))], ['beLayer', () => closeL($('#beLayer'))], ['sheetLayer', closeSheet]];
   for (const [id, fn] of order) if (isOpen($('#' + id))) { e.preventDefault(); fn(); return; }
