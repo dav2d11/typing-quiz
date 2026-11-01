@@ -224,6 +224,18 @@ textarea.inp{resize:vertical;min-height:84px;line-height:1.5}
 .r-desc{color:var(--sub);font-size:14px;overflow-wrap:anywhere}
 .result .btn{min-width:200px}
 
+/* ---- bulk select ---- */
+.m-tools{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;padding:2px 0 8px;background:var(--bg)}
+.m-tools .sel-n{flex:1;font-size:13px;font-weight:650;color:var(--sub)}
+.qchk,.gchk{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--line2);display:flex;align-items:center;justify-content:center;color:transparent;flex:none;padding:0}
+.qchk .i,.gchk .i{width:13px;height:13px;stroke-width:3.4}
+.qchk.on,.gchk.on{background:var(--accent);border-color:var(--accent);color:#0a0c10}
+.gchk.part{border-color:var(--accent)}
+.gchk.part::after{content:"";width:9px;height:2.5px;border-radius:2px;background:var(--accent)}
+.gchk.part .i{display:none}
+.qrow.sel{border-color:var(--accent);background:var(--accent-soft)}
+.be-body{display:flex;flex-direction:column;gap:16px;padding-top:6px}
+.be-note{font-size:13px;color:var(--sub)}
 /* ---- sync / brand / wrong subjects ---- */
 .brand-img{width:30px;height:30px;border-radius:8px;display:block;flex:none}
 .sync{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:99px;background:var(--s2);border:1px solid var(--line);font-size:12px;font-weight:650;color:var(--sub)}
@@ -468,6 +480,7 @@ mark{background:rgba(242,197,107,.28);color:var(--warn);border-radius:4px;paddin
     </div>
     <div class="m-list" id="mList"></div>
   </div>
+  <div class="foot" id="selFoot" hidden><button class="btn" id="selNo">취소</button><button class="btn primary" id="selEdit" disabled>수정</button></div>
 </section>
 
 <!-- 주제 선택 시트 -->
@@ -484,6 +497,28 @@ mark{background:rgba(242,197,107,.28);color:var(--warn);border-radius:4px;paddin
     <div class="sheet-body" id="sheetBody"></div>
     <div class="sheet-body" id="sheetResults" hidden></div>
     <div class="sheet-foot"><button class="btn primary" id="tStart" disabled>시작</button></div>
+  </div>
+</div>
+
+<!-- 일괄 수정 -->
+<div class="layer" id="beLayer">
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2>선택한 문제 일괄 수정</h2></div>
+    <div class="sheet-body">
+      <div class="be-body">
+        <p class="be-note" id="beNote"></p>
+        <div class="field"><span>형식</span><div class="seg" id="beType"><button type="button" class="on" data-v="">유지</button><button type="button" data-v="short">주관식</button><button type="button" data-v="card">카드</button></div></div>
+        <div class="field"><span>정답 순서 맞춤 (주관식만)</span><div class="seg" id="beStrict"><button type="button" class="on" data-v="">유지</button><button type="button" data-v="on">켜기</button><button type="button" data-v="off">끄기</button></div></div>
+        <div class="two">
+          <label class="field"><span>과목 이동</span><input class="inp" id="beS" list="dlS" placeholder="유지" autocomplete="off"></label>
+          <label class="field"><span>주제 이동</span><input class="inp" id="beT" list="dlBT" placeholder="유지" autocomplete="off"></label>
+        </div>
+        <datalist id="dlBT"></datalist>
+      </div>
+    </div>
+    <div class="sheet-foot"><button class="btn primary" id="beGo">적용</button></div>
   </div>
 </div>
 
@@ -1283,6 +1318,14 @@ $('#eType').onclick = e => { const b = e.target.closest('[data-type]'); if (b &&
 const openSec = new Set();
 const kS = s => 's' + SEP + s, kF = (s, f) => 'f' + SEP + s + SEP + f, kT = (s, t) => 't' + SEP + s + SEP + t;
 let mImg = null, mStrict = false, mType = '';
+let selMode = false; const selSet = new Set();
+const idsOfTopic = (s, t) => (D[s]?.[t] || []).map(q => q.id);
+const idsOfFolder = (s, f) => Object.keys(D[s] || {}).filter(t => folderOf(s, t) === f).flatMap(t => idsOfTopic(s, t));
+const idsOfSubject = s => Object.keys(D[s] || {}).flatMap(t => idsOfTopic(s, t));
+const gchk = ids => { const n = ids.filter(i => selSet.has(i)).length; return `<button class="gchk${n && n === ids.length ? ' on' : n ? ' part' : ''}" data-act="gsel" aria-label="전체 선택">${ic('check')}</button>`; };
+function selUI() { $('#selFoot').hidden = !selMode; const b = $('#selEdit'); b.disabled = !selSet.size; b.textContent = selSet.size ? `수정 · ${selSet.size}개` : '수정'; }
+function setSel(on) { selMode = on; if (!on) selSet.clear(); renderManage(); }
+function toggleSel(id) { selSet.has(id) ? selSet.delete(id) : selSet.add(id); renderManage(); }
 
 function datalists() {
   $('#dlS').innerHTML = subjects().map(s => `<option value="${esc(s)}">`).join('');
@@ -1310,30 +1353,41 @@ function addQuestion() {
 const chev = o => ic('chev', o ? 'chev on' : 'chev');
 function topicHTML(s, t) {
   const open = openSec.has(kT(s, t)), qs = D[s][t] || [];
-  const body = open ? qs.map(q => `<div class="qrow" data-id="${esc(q.id)}" data-s="${esc(s)}" data-t="${esc(t)}">${q.img ? '<img class="qthumb zoom" loading="lazy" decoding="async" draggable="false" alt="">' : ''}<div class="qtext"><div class="q1">${q.q ? fmt(q.q) : '<span class="muted">이미지 문제</span>'}</div><div class="q2">${q.type === 'card' ? ic('card', 'inl') : ''}${fmt(q.a)}</div></div><div class="qacts">${q.type === 'card' ? '' : `<button class="mini sq${q.strict ? ' on' : ''}" data-act="strict" aria-label="순서 맞춤">${ic('order')}</button>`}<button class="mini sq" data-act="edit" aria-label="수정">${ic('edit')}</button><button class="mini sq del" data-act="qdel" aria-label="삭제">${ic('x')}</button></div></div>`).join('') : '';
-  return `<div class="topic" draggable="true" data-s="${esc(s)}" data-t="${esc(t)}"><div class="acc-head lvl3" data-tog="t"><span class="acc-title">${ic('grip', 'grip')}<b>${esc(t)}</b><em>${qs.length}</em></span><span class="acc-tools"><button class="mini sq" data-act="move" aria-label="폴더 이동">${ic('folder')}</button><button class="mini sq del" data-act="tdel" aria-label="삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
+  const body = open ? qs.map(q => `<div class="qrow${selMode && selSet.has(q.id) ? ' sel' : ''}" data-id="${esc(q.id)}" data-s="${esc(s)}" data-t="${esc(t)}">${selMode ? `<span class="qchk${selSet.has(q.id) ? ' on' : ''}">${ic('check')}</span>` : ''}${q.img ? '<img class="qthumb zoom" loading="lazy" decoding="async" draggable="false" alt="">' : ''}<div class="qtext"><div class="q1">${q.q ? fmt(q.q) : '<span class="muted">이미지 문제</span>'}</div><div class="q2">${q.type === 'card' ? ic('card', 'inl') : ''}${fmt(q.a)}</div></div><div class="qacts"${selMode ? ' hidden' : ''}>${q.type === 'card' ? '' : `<button class="mini sq${q.strict ? ' on' : ''}" data-act="strict" aria-label="순서 맞춤">${ic('order')}</button>`}<button class="mini sq" data-act="edit" aria-label="수정">${ic('edit')}</button><button class="mini sq del" data-act="qdel" aria-label="삭제">${ic('x')}</button></div></div>`).join('') : '';
+  return `<div class="topic" draggable="true" data-s="${esc(s)}" data-t="${esc(t)}"><div class="acc-head lvl3" data-tog="t"><span class="acc-title">${selMode ? gchk(idsOfTopic(s, t)) : ''}${ic('grip', 'grip')}<b>${esc(t)}</b><em>${qs.length}</em></span><span class="acc-tools"><button class="mini sq" data-act="move" aria-label="폴더 이동">${ic('folder')}</button><button class="mini sq del" data-act="tdel" aria-label="삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
 }
 function folderHTML(s, f, topics) {
   const open = openSec.has(kF(s, f)), n = topics.reduce((a, t) => a + D[s][t].length, 0);
-  return `<div class="fold" draggable="true" data-s="${esc(s)}" data-f="${esc(f)}"><div class="acc-head lvl2" data-tog="f"><span class="acc-title">${ic('grip', 'grip')}${ic('folder')}<b>${esc(f)}</b><em>${n}</em></span><span class="acc-tools"><button class="mini sq del" data-act="fdel" aria-label="폴더 삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${topics.map(t => topicHTML(s, t)).join('')}</div>` : ''}</div>`;
+  return `<div class="fold" draggable="true" data-s="${esc(s)}" data-f="${esc(f)}"><div class="acc-head lvl2" data-tog="f"><span class="acc-title">${selMode ? gchk(idsOfFolder(s, f)) : ''}${ic('grip', 'grip')}${ic('folder')}<b>${esc(f)}</b><em>${n}</em></span><span class="acc-tools"><button class="mini sq del" data-act="fdel" aria-label="폴더 삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${topics.map(t => topicHTML(s, t)).join('')}</div>` : ''}</div>`;
 }
 function subjectHTML(s) {
   const open = openSec.has(kS(s)), fl = folderList(s), fm = {}, un = [];
   Object.keys(D[s]).forEach(t => { const f = folderOf(s, t); f ? (fm[f] ??= []).push(t) : un.push(t); });
   const body = open ? fl.map(f => folderHTML(s, f, fm[f] || [])).join('') + `<div class="uncat" data-s="${esc(s)}">${un.map(t => topicHTML(s, t)).join('')}</div>` : '';
-  return `<div class="acc" data-s="${esc(s)}"><div class="acc-head lvl1" data-tog="s"><span class="acc-title"><b>${esc(s)}</b><em>${countOf(s)}</em></span><span class="acc-tools"><button class="mini" data-act="addf">${ic('plus')}폴더</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
+  return `<div class="acc" data-s="${esc(s)}"><div class="acc-head lvl1" data-tog="s"><span class="acc-title">${selMode ? gchk(idsOfSubject(s)) : ''}<b>${esc(s)}</b><em>${countOf(s)}</em></span><span class="acc-tools"><button class="mini" data-act="addf">${ic('plus')}폴더</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
 }
 function renderManage() {
   const el = $('#mList'), subs = Object.keys(D);
-  if (!subs.length) { el.innerHTML = '<div class="empty">등록된 문제가 없습니다</div>'; return; }
-  el.innerHTML = subs.map(subjectHTML).join('');
+  if (!subs.length) { selMode = false; selSet.clear(); selUI(); el.innerHTML = '<div class="empty">등록된 문제가 없습니다</div>'; return; }
+  if (selSet.size) { const all = new Set(subs.flatMap(idsOfSubject)); [...selSet].forEach(i => all.has(i) || selSet.delete(i)); }
+  const tools = `<div class="m-tools"><button class="mini" data-act="selmode">${selMode ? '완료' : '선택'}</button>${selMode ? `<span class="sel-n">${selSet.size}개 선택</span><button class="mini" data-act="selall">전체</button><button class="mini" data-act="selnone">해제</button>` : ''}</div>`;
+  el.innerHTML = tools + subs.map(subjectHTML).join('');
+  selUI();
   hydrate(el, '.qthumb', im => { const r = im.closest('.qrow'); return D[r.dataset.s]?.[r.dataset.t]?.find(q => q.id === r.dataset.id)?.img; });
 }
 $('#mList').addEventListener('click', async e => {
+  if (selMode && !e.target.closest('img.zoom')) { const r = e.target.closest('.qrow'); if (r) { toggleSel(r.dataset.id); return; } }
   const b = e.target.closest('[data-act]');
   if (b) {
     const a = b.dataset.act, sb = b.closest('.acc')?.dataset.s;
-    if (a === 'addf') {
+    if (a === 'selmode') setSel(!selMode);
+    else if (a === 'selall') { Object.keys(D).forEach(x => idsOfSubject(x).forEach(i => selSet.add(i))); renderManage(); }
+    else if (a === 'selnone') { selSet.clear(); renderManage(); }
+    else if (a === 'gsel') {
+      const g = b.closest('.topic, .fold, .acc'), d = g.dataset;
+      const ids = g.classList.contains('topic') ? idsOfTopic(d.s, d.t) : g.classList.contains('fold') ? idsOfFolder(d.s, d.f) : idsOfSubject(d.s);
+      const all = ids.every(i => selSet.has(i)); ids.forEach(i => all ? selSet.delete(i) : selSet.add(i)); renderManage();
+    } else if (a === 'addf') {
       const v = await dialog({ title: '폴더 추가', input: {}, ok: '추가' });
       if (v && v.trim()) { addFolder(sb, v); openSec.add(kS(sb)); save.folders(); renderManage(); }
     } else if (a === 'fdel') {
@@ -1439,6 +1493,35 @@ document.addEventListener('paste', async e => {
 });
 
 /* 백업 */
+['beType', 'beStrict'].forEach(id => { const g = $('#' + id); g.onclick = e => { const b = e.target.closest('button'); if (b) $$('button', g).forEach(x => x.classList.toggle('on', x === b)); }; });
+$('#selNo').onclick = () => setSel(false);
+$('#selEdit').onclick = () => {
+  if (!selSet.size) return;
+  $('#beNote').textContent = `선택한 ${selSet.size}개 문제에 적용됩니다. 바꾸지 않을 항목은 "유지"로 두세요.`;
+  ['beType', 'beStrict'].forEach(id => $$('#' + id + ' button').forEach((x, i) => x.classList.toggle('on', i === 0)));
+  $('#beS').value = ''; $('#beT').value = ''; $('#dlBT').innerHTML = '';
+  openL($('#beLayer'));
+};
+$('#beS').oninput = () => { const v = $('#beS').value.trim(); $('#dlBT').innerHTML = v && D[v] ? topicsOf(v).map(t => `<option value="${esc(t)}">`).join('') : ''; };
+$('#beGo').onclick = () => {
+  const ty = $('#beType .on').dataset.v, st = $('#beStrict .on').dataset.v, ns = $('#beS').value.trim(), nt = $('#beT').value.trim();
+  if (!ty && !st && !ns && !nt) return toast('바꿀 항목을 선택하세요', 'bad');
+  let n = 0; const moves = [];
+  for (const s of Object.keys(D)) for (const t of Object.keys(D[s])) for (const q of D[s][t]) {
+    if (!selSet.has(q.id)) continue; n++;
+    if (ty === 'card') { q.type = 'card'; delete q.strict; } else if (ty === 'short') delete q.type;
+    if (st && q.type !== 'card') { if (st === 'on') q.strict = true; else delete q.strict; }
+    const ts = ns || s, tt = nt || t;
+    if (ts !== s || tt !== t) moves.push({ q, s, t, ts, tt });
+    const w = W.find(x => x.id === q.id);
+    if (w) { if (q.type === 'card') w.type = 'card'; else delete w.type; if (q.strict) w.strict = true; else delete w.strict; if (ts !== s || tt !== t) { w.subject = ts; w.topic = tt; } }
+  }
+  moves.forEach(m => { D[m.s][m.t] = D[m.s][m.t].filter(x => x !== m.q); ((D[m.ts] ??= {})[m.tt] ??= []).push(m.q); openSec.add(kS(m.ts)); openSec.add(kT(m.ts, m.tt)); });
+  moves.forEach(m => { if (D[m.s] && D[m.s][m.t] && !D[m.s][m.t].length) { delete D[m.s][m.t]; unmapTopic(m.s, m.t); } if (D[m.s] && !Object.keys(D[m.s]).length) delete D[m.s]; });
+  save.data(); save.wrong(); if (moves.length) save.folders();
+  closeL($('#beLayer')); setSel(false); datalists(); renderHome(); renderBadges();
+  toast(`${n}개 문제를 수정했습니다`);
+};
 const xk = (s, t) => s + '\u0001' + t;
 const xSel = new Set();
 async function exportBackup(sel, withWrong) {
@@ -1550,7 +1633,7 @@ addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyO' && cur === 'manage') { e.preventDefault(); mStrict = sw($('#mStrict')); return; }
   if (e.key === 'Enter' && cur === 'game' && G.qs[G.i]?.type === 'card' && !isOpen($('#dlgLayer'))) { e.preventDefault(); G.flipped ? cardDone(true) : flip(); return; }
   if (e.key !== 'Escape') return;
-  const order = [['dlgLayer', dlgCancel], ['lb', closeLb], ['qeLayer', closeEditor], ['exLayer', () => closeL($('#exLayer'))], ['sheetLayer', closeSheet]];
+  const order = [['dlgLayer', dlgCancel], ['lb', closeLb], ['qeLayer', closeEditor], ['exLayer', () => closeL($('#exLayer'))], ['beLayer', () => closeL($('#beLayer'))], ['sheetLayer', closeSheet]];
   for (const [id, fn] of order) if (isOpen($('#' + id))) { e.preventDefault(); fn(); return; }
   if (cur === 'game') { e.preventDefault(); skip(); }
 }, true);
@@ -1620,6 +1703,13 @@ const cloud = (() => {
     return ch;
   }
   function applyW(snap) {
+    if (replaceW) {
+      if (snap.metadata.fromCache) return false;
+      replaceW = false;
+      const rm = remoteMap(snap), lw = localW();
+      for (const id of rm.keys()) if (!lw.has(id)) col.w.doc(id).delete().catch(onErr);
+      P.w = {}; dirty.add('w'); schedule(); return false;
+    }
     const ch = merge('w', snap, localW(), remoteMap(snap), v => hs(JSON.stringify(wNorm(v))),
       id => { const i = W.findIndex(n => n.id === id); if (i >= 0) W.splice(i, 1); },
       (id, v) => {
@@ -1688,7 +1778,7 @@ const cloud = (() => {
   }
   const onErr = e => { console.error('sync', e); setSt('err', e); };
 
-  let unsubs = [], curUid = null, auth = null;
+  let unsubs = [], curUid = null, auth = null, replaceW = false;
   function attach(c) {
     unsubs.forEach(f => f()); unsubs = [];
     col.q = c.q; col.w = c.w; mRef = c.m; live = true; gotFresh = false;
@@ -1712,6 +1802,11 @@ const cloud = (() => {
     const pd = dialog({ title: '비밀번호', text: '6자 이상', input: { placeholder: '비밀번호' }, ok: '확인' });
     $('#dlgInput').type = 'password'; const pw = await pd; $('#dlgInput').type = 'text';
     if (!pw) return;
+    if (W.length && !Object.keys(P.w).length) {
+      const c = await dialog({ title: '오답노트 처리', text: `이 기기에 오답노트가 ${W.length}개 있습니다. 클라우드에 이미 저장된 오답노트가 있다면 어떻게 할까요?`, list: [{ label: '합치기 (둘 다 유지)', value: 'merge' }, { label: '이 기기 것으로 교체 (클라우드의 기존 오답노트 삭제)', value: 'replace' }] });
+      if (!c) return;
+      replaceW = c === 'replace';
+    }
     const e1 = em.trim();
     try { await auth.signInWithEmailAndPassword(e1, pw); }
     catch (e) {
