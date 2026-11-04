@@ -643,7 +643,7 @@ const genId = () => 'q_' + Date.now().toString(36) + '_' + Math.random().toStrin
 const shuffle = a => { const c = [...a]; for (let i = c.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [c[i], c[j]] = [c[j], c[i]]; } return c; };
 const SEP = '\u0001';
 const TIME = { base: 6, per: 1.1, min: 6, max: 30 };
-const K = { custom: 'quiz_custom_data', wrong: 'quiz_wrong_notes', folders: 'quiz_topic_folders', created: 'quiz_created_folders', sync: 'quiz_sync_state' };
+const K = { custom: 'quiz_custom_data', wrong: 'quiz_wrong_notes', folders: 'quiz_topic_folders', created: 'quiz_created_folders', empty: 'quiz_empty_topics', sync: 'quiz_sync_state' };
 
 $$('[data-i]').forEach(el => { el.outerHTML = ic(el.dataset.i, el.dataset.c || ''); });
 
@@ -730,13 +730,23 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 /* =========================================================================
  * 데이터
  * ========================================================================= */
-let D = {}, TF = {}, CF = {}, W = [];
+let D = {}, TF = {}, CF = {}, ET = {}, W = [];
 let wrongSubject = null;
 const wrongOf = s => W.filter(n => n.subject === s);
+/* 문제가 없는 빈 주제도 유지하기 위한 목록(ET). D에서 비어 있는 주제를 계산해 저장/동기화한다. */
+function syncET() {
+  const o = {};
+  for (const s in D) for (const t in D[s]) if (!D[s][t].length) (o[s] ??= []).push(t);
+  ET = o;
+}
+function ensureTopics() {
+  for (const s in ET) (ET[s] || []).forEach(t => { const m = (D[s] ??= {}); if (!m[t]) m[t] = []; });
+}
+const metaObj = () => (Object.keys(ET).length ? { tf: TF, cf: CF, et: ET } : { tf: TF, cf: CF });
 const save = {
-  data: () => { queueSave(K.custom, D); cloud.touch('q'); },
+  data: () => { syncET(); queueSave(K.custom, D); queueSave(K.empty, ET); cloud.touch('q'); cloud.touch('m'); },
   wrong: () => { queueSave(K.wrong, W); cloud.touch('w'); },
-  folders: () => { queueSave(K.folders, TF); queueSave(K.created, CF); cloud.touch('m'); }
+  folders: () => { syncET(); queueSave(K.folders, TF); queueSave(K.created, CF); queueSave(K.empty, ET); cloud.touch('m'); }
 };
 const subjects = () => Object.keys(D);
 const topicsOf = s => Object.keys(D[s] || {});
@@ -1513,7 +1523,6 @@ function saveEditor() {
     if (loc.s === s && loc.t === t) D[s][t][loc.i] = e;
     else {
       const arr = D[loc.s][loc.t]; arr.splice(loc.i, 1);
-      if (!arr.length) { delete D[loc.s][loc.t]; unmapTopic(loc.s, loc.t); }
       if (!Object.keys(D[loc.s]).length) delete D[loc.s];
       ((D[s] ??= {})[t] ??= []).push(e);
     }
@@ -1531,7 +1540,7 @@ function saveEditor() {
   toast(loc ? '수정했습니다' : '오답노트의 문제만 수정했습니다');
 }
 function refreshAll() {
-  renderBadges(); renderHome(); renderManage(); datalists();
+  ensureTopics(); renderBadges(); renderHome(); renderManage(); datalists();
   if (cur === 'wrong') renderWrong();
   if (isOpen($('#sheetLayer'))) { if (!D[sheetSubject]) closeSheet(); else if (sQ) renderSearch(); }
 }
@@ -1585,18 +1594,18 @@ function addQuestion() {
 const chev = o => ic('chev', o ? 'chev on' : 'chev');
 function topicHTML(s, t) {
   const open = openSec.has(kT(s, t)), qs = D[s][t] || [];
-  const body = open ? qs.map(q => `<div class="qrow${selMode && selSet.has(q.id) ? ' sel' : ''}" data-id="${esc(q.id)}" data-s="${esc(s)}" data-t="${esc(t)}">${selMode ? `<span class="qchk${selSet.has(q.id) ? ' on' : ''}">${ic('check')}</span>` : ''}${q.img ? '<img class="qthumb zoom" loading="lazy" decoding="async" draggable="false" alt="">' : ''}<div class="qtext"><div class="q1">${q.q ? fmt(q.q) : '<span class="muted">이미지 문제</span>'}</div><div class="q2">${q.type === 'card' ? ic('card', 'inl') : ''}${fmt(q.a)}</div></div><div class="qacts"${selMode ? ' hidden' : ''}>${q.type === 'card' ? '' : `<button class="mini sq${q.strict ? ' on' : ''}" data-act="strict" aria-label="순서 맞춤">${ic('order')}</button>`}<button class="mini sq" data-act="edit" aria-label="수정">${ic('edit')}</button><button class="mini sq del" data-act="qdel" aria-label="삭제">${ic('x')}</button></div></div>`).join('') : '';
+  const body = open ? (qs.length ? '' : '<div class="empty" style="padding:14px 8px;font-size:13px">문제가 없습니다</div>') + qs.map(q => `<div class="qrow${selMode && selSet.has(q.id) ? ' sel' : ''}" data-id="${esc(q.id)}" data-s="${esc(s)}" data-t="${esc(t)}">${selMode ? `<span class="qchk${selSet.has(q.id) ? ' on' : ''}">${ic('check')}</span>` : ''}${q.img ? '<img class="qthumb zoom" loading="lazy" decoding="async" draggable="false" alt="">' : ''}<div class="qtext"><div class="q1">${q.q ? fmt(q.q) : '<span class="muted">이미지 문제</span>'}</div><div class="q2">${q.type === 'card' ? ic('card', 'inl') : ''}${fmt(q.a)}</div></div><div class="qacts"${selMode ? ' hidden' : ''}>${q.type === 'card' ? '' : `<button class="mini sq${q.strict ? ' on' : ''}" data-act="strict" aria-label="순서 맞춤">${ic('order')}</button>`}<button class="mini sq" data-act="edit" aria-label="수정">${ic('edit')}</button><button class="mini sq del" data-act="qdel" aria-label="삭제">${ic('x')}</button></div></div>`).join('') : '';
   return `<div class="topic" draggable="true" data-s="${esc(s)}" data-t="${esc(t)}"><div class="acc-head lvl3" data-tog="t"><span class="acc-title">${selMode ? gchk(idsOfTopic(s, t)) : ''}${ic('grip', 'grip')}<b>${esc(t)}</b><em>${qs.length}</em></span><span class="acc-tools"><button class="mini sq" data-act="move" aria-label="폴더 이동">${ic('folder')}</button><button class="mini sq del" data-act="tdel" aria-label="삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
 }
 function folderHTML(s, f, topics) {
   const open = openSec.has(kF(s, f)), n = topics.reduce((a, t) => a + D[s][t].length, 0);
-  return `<div class="fold" draggable="true" data-s="${esc(s)}" data-f="${esc(f)}"><div class="acc-head lvl2" data-tog="f"><span class="acc-title">${selMode ? gchk(idsOfFolder(s, f)) : ''}${ic('grip', 'grip')}${ic('folder')}<b>${esc(f)}</b><em>${n}</em></span><span class="acc-tools"><button class="mini sq del" data-act="fdel" aria-label="폴더 삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${topics.map(t => topicHTML(s, t)).join('')}</div>` : ''}</div>`;
+  return `<div class="fold" draggable="true" data-s="${esc(s)}" data-f="${esc(f)}"><div class="acc-head lvl2" data-tog="f"><span class="acc-title">${selMode ? gchk(idsOfFolder(s, f)) : ''}${ic('grip', 'grip')}${ic('folder')}<b>${esc(f)}</b><em>${n}</em></span><span class="acc-tools"><button class="mini" data-act="addt">${ic('plus')}주제</button><button class="mini sq del" data-act="fdel" aria-label="폴더 삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${topics.map(t => topicHTML(s, t)).join('')}</div>` : ''}</div>`;
 }
 function subjectHTML(s) {
   const open = openSec.has(kS(s)), fl = folderList(s), fm = {}, un = [];
   Object.keys(D[s]).forEach(t => { const f = folderOf(s, t); f ? (fm[f] ??= []).push(t) : un.push(t); });
   const body = open ? fl.map(f => folderHTML(s, f, fm[f] || [])).join('') + `<div class="uncat" data-s="${esc(s)}">${un.map(t => topicHTML(s, t)).join('')}</div>` : '';
-  return `<div class="acc" data-s="${esc(s)}"><div class="acc-head lvl1" data-tog="s"><span class="acc-title">${selMode ? gchk(idsOfSubject(s)) : ''}<b>${esc(s)}</b><em>${countOf(s)}</em></span><span class="acc-tools"><button class="mini" data-act="addf">${ic('plus')}폴더</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
+  return `<div class="acc" data-s="${esc(s)}"><div class="acc-head lvl1" data-tog="s"><span class="acc-title">${selMode ? gchk(idsOfSubject(s)) : ''}<b>${esc(s)}</b><em>${countOf(s)}</em></span><span class="acc-tools"><button class="mini" data-act="addt">${ic('plus')}주제</button><button class="mini" data-act="addf">${ic('plus')}폴더</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
 }
 function renderManage() {
   const el = $('#mList'), subs = Object.keys(D);
@@ -1619,6 +1628,22 @@ $('#mList').addEventListener('click', async e => {
       const g = b.closest('.topic, .fold, .acc'), d = g.dataset;
       const ids = g.classList.contains('topic') ? idsOfTopic(d.s, d.t) : g.classList.contains('fold') ? idsOfFolder(d.s, d.f) : idsOfSubject(d.s);
       const all = ids.every(i => selSet.has(i)); ids.forEach(i => all ? selSet.delete(i) : selSet.add(i)); renderManage();
+    } else if (a === 'addt') {
+      const fd = b.closest('.fold'), f = fd ? fd.dataset.f : '';
+      const v = await dialog({ title: f ? `주제 추가 · ${f}` : '주제 추가', text: `"${sb}" 과목에 문제 없이 주제만 만듭니다.`, input: { placeholder: '주제 이름' }, ok: '추가' });
+      const t = v && v.trim();
+      if (t) {
+        if (D[sb]?.[t]) {
+          toast('이미 있는 주제입니다', 'bad');
+          openSec.add(kS(sb)); if (folderOf(sb, t)) openSec.add(kF(sb, folderOf(sb, t))); openSec.add(kT(sb, t));
+        } else {
+          D[sb][t] = [];
+          if (f) { setFolder(sb, t, f); openSec.add(kF(sb, f)); }
+          openSec.add(kS(sb)); openSec.add(kT(sb, t));
+          toast(`주제 추가됨 · ${t}`);
+        }
+        save.data(); save.folders(); renderManage(); datalists(); renderHome();
+      }
     } else if (a === 'addf') {
       const v = await dialog({ title: '폴더 추가', input: {}, ok: '추가' });
       if (v && v.trim()) { addFolder(sb, v); openSec.add(kS(sb)); save.folders(); renderManage(); }
@@ -1647,7 +1672,6 @@ $('#mList').addEventListener('click', async e => {
       } else if (a === 'edit') openEditor({ ...q, subject: s, topic: t });
       else if (a === 'qdel') {
         D[s][t] = D[s][t].filter(x => x !== q);
-        if (!D[s][t].length) { delete D[s][t]; unmapTopic(s, t); }
         if (!Object.keys(D[s]).length) delete D[s];
         save.data(); save.folders(); renderManage(); datalists(); renderHome();
       }
@@ -1749,8 +1773,7 @@ $('#beGo').onclick = () => {
     if (w) { if (q.type === 'card') w.type = 'card'; else delete w.type; if (q.strict) w.strict = true; else delete w.strict; if (ts !== s || tt !== t) { w.subject = ts; w.topic = tt; } }
   }
   moves.forEach(m => { D[m.s][m.t] = D[m.s][m.t].filter(x => x !== m.q); ((D[m.ts] ??= {})[m.tt] ??= []).push(m.q); openSec.add(kS(m.ts)); openSec.add(kT(m.ts, m.tt)); });
-  moves.forEach(m => { if (D[m.s] && D[m.s][m.t] && !D[m.s][m.t].length) { delete D[m.s][m.t]; unmapTopic(m.s, m.t); } if (D[m.s] && !Object.keys(D[m.s]).length) delete D[m.s]; });
-  save.data(); save.wrong(); if (moves.length) save.folders();
+  save.data(); save.wrong(); save.folders();
   closeL($('#beLayer')); setSel(false); datalists(); renderHome(); renderBadges();
   toast(`${n}개 문제를 수정했습니다`);
 };
@@ -1780,12 +1803,12 @@ async function importBackup(file) {
     if (!p || typeof p !== 'object') throw 0;
     const ids = new Set(); for (const s in D) for (const t in D[s]) D[s][t].forEach(q => ids.add(q.id));
     const cd = p.customData || {};
-    for (const s in cd) for (const t in cd[s]) (cd[s][t] || []).forEach(q => {
+    for (const s in cd) for (const t in cd[s]) { ((D[s] ??= {})[t] ??= []); (cd[s][t] || []).forEach(q => {
       const arr = ((D[s] ??= {})[t] ??= []);
       if ((q.id && ids.has(q.id)) || arr.some(x => x.q === q.q && x.a === q.a && !!x.img === !!q.img)) return;
       const e = { id: q.id || genId(), q: q.q, a: q.a }; if (q.img) e.img = q.img; if (q.type === 'card') e.type = 'card'; else if (q.strict) e.strict = true;
       arr.push(e); ids.add(e.id);
-    });
+    }); }
     for (const s in (p.topicFolders || {})) for (const t in p.topicFolders[s]) (TF[s] ??= {})[t] = p.topicFolders[s][t];
     for (const s in (p.createdFolders || {})) (p.createdFolders[s] || []).forEach(f => addFolder(s, f));
     (p.wrongNotes || []).forEach(n => {
@@ -1948,8 +1971,8 @@ const cloud = (() => {
     return ch;
   }
   function applyM(snap) {
-    const v = snap.exists ? snap.data() : null, ls = JSON.stringify({ tf: TF, cf: CF }), lh = hs(ls);
-    const empty = !Object.keys(TF).length && !Object.keys(CF).length;
+    const v = snap.exists ? snap.data() : null, ls = JSON.stringify(metaObj()), lh = hs(ls);
+    const empty = !Object.keys(TF).length && !Object.keys(CF).length && !Object.keys(ET).length;
     if (!v || typeof v.j !== 'string') { if (!empty) { dirty.add('m'); schedule(); } return false; }
     const rh = hs(v.j);
     if (P.m && lh !== P.m) { dirty.add('m'); schedule(); return false; }
@@ -1959,9 +1982,10 @@ const cloud = (() => {
       const tf = p.tf || {}, cf = p.cf || {};
       for (const s in TF) tf[s] = { ...TF[s], ...(tf[s] || {}) };
       for (const s in CF) cf[s] = [...new Set([...(cf[s] || []), ...CF[s]])];
-      p = { tf, cf }; dirty.add('m'); schedule(); P.m = '';
+      const et = p.et || {}; for (const s in ET) et[s] = [...new Set([...(et[s] || []), ...ET[s]])];
+      p = { tf, cf, et }; dirty.add('m'); schedule(); P.m = '';
     } else P.m = rh;
-    TF = p.tf || {}; CF = p.cf || {}; queueSave(K.folders, TF); queueSave(K.created, CF);
+    TF = p.tf || {}; CF = p.cf || {}; ET = p.et || {}; ensureTopics(); queueSave(K.folders, TF); queueSave(K.created, CF); queueSave(K.empty, ET);
     return true;
   }
 
@@ -1971,7 +1995,7 @@ const cloud = (() => {
   }
   async function pushKind(kind) {
     if (kind === 'm') {
-      const ser = JSON.stringify({ tf: TF, cf: CF }), h = hs(ser), empty = !Object.keys(TF).length && !Object.keys(CF).length;
+      const ser = JSON.stringify(metaObj()), h = hs(ser), empty = !Object.keys(TF).length && !Object.keys(CF).length && !Object.keys(ET).length;
       if (h !== P.m && !(empty && !P.m)) { await mRef.set({ j: ser }); P.m = h; }
       return;
     }
@@ -2080,8 +2104,8 @@ $('#syncBtn').onclick = async () => {
   $('#brandImg').src = $('link[rel="apple-touch-icon"]').href;
   let sync = null;
   try {
-    const r = await Promise.all([K.custom, K.folders, K.created, K.wrong, K.sync].map(loadStore));
-    D = r[0] || {}; TF = r[1] || {}; CF = r[2] || {}; W = Array.isArray(r[3]) ? r[3] : []; sync = r[4];
+    const r = await Promise.all([K.custom, K.folders, K.created, K.wrong, K.sync, K.empty].map(loadStore));
+    D = r[0] || {}; TF = r[1] || {}; CF = r[2] || {}; W = Array.isArray(r[3]) ? r[3] : []; sync = r[4]; ET = r[5] || {}; ensureTopics();
     if (backfill()) { save.data(); save.wrong(); }
   } catch {}
   renderHome();
