@@ -1595,7 +1595,7 @@ const chev = o => ic('chev', o ? 'chev on' : 'chev');
 function topicHTML(s, t) {
   const open = openSec.has(kT(s, t)), qs = D[s][t] || [];
   const body = open ? (qs.length ? '' : '<div class="empty" style="padding:14px 8px;font-size:13px">문제가 없습니다</div>') + qs.map(q => `<div class="qrow${selMode && selSet.has(q.id) ? ' sel' : ''}" data-id="${esc(q.id)}" data-s="${esc(s)}" data-t="${esc(t)}">${selMode ? `<span class="qchk${selSet.has(q.id) ? ' on' : ''}">${ic('check')}</span>` : ''}${q.img ? '<img class="qthumb zoom" loading="lazy" decoding="async" draggable="false" alt="">' : ''}<div class="qtext"><div class="q1">${q.q ? fmt(q.q) : '<span class="muted">이미지 문제</span>'}</div><div class="q2">${q.type === 'card' ? ic('card', 'inl') : ''}${fmt(q.a)}</div></div><div class="qacts"${selMode ? ' hidden' : ''}>${q.type === 'card' ? '' : `<button class="mini sq${q.strict ? ' on' : ''}" data-act="strict" aria-label="순서 맞춤">${ic('order')}</button>`}<button class="mini sq" data-act="edit" aria-label="수정">${ic('edit')}</button><button class="mini sq del" data-act="qdel" aria-label="삭제">${ic('x')}</button></div></div>`).join('') : '';
-  return `<div class="topic" draggable="true" data-s="${esc(s)}" data-t="${esc(t)}"><div class="acc-head lvl3" data-tog="t"><span class="acc-title">${selMode ? gchk(idsOfTopic(s, t)) : ''}${ic('grip', 'grip')}<b>${esc(t)}</b><em>${qs.length}</em></span><span class="acc-tools"><button class="mini sq" data-act="move" aria-label="폴더 이동">${ic('folder')}</button><button class="mini sq del" data-act="tdel" aria-label="삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
+  return `<div class="topic" draggable="true" data-s="${esc(s)}" data-t="${esc(t)}"><div class="acc-head lvl3" data-tog="t"><span class="acc-title">${selMode ? gchk(idsOfTopic(s, t)) : ''}${ic('grip', 'grip')}<b>${esc(t)}</b><em>${qs.length}</em></span><span class="acc-tools"><button class="mini sq" data-act="trename" aria-label="이름 수정">${ic('edit')}</button><button class="mini sq" data-act="move" aria-label="폴더 이동">${ic('folder')}</button><button class="mini sq del" data-act="tdel" aria-label="삭제">${ic('trash')}</button>${chev(open)}</span></div>${open ? `<div class="acc-body">${body}</div>` : ''}</div>`;
 }
 function folderHTML(s, f, topics) {
   const open = openSec.has(kF(s, f)), n = topics.reduce((a, t) => a + D[s][t].length, 0);
@@ -1650,6 +1650,19 @@ $('#mList').addEventListener('click', async e => {
     } else if (a === 'fdel') {
       const f = b.closest('.fold').dataset.f;
       if (await dialog({ title: '폴더 삭제', text: `"${f}" 폴더를 삭제할까요? 안의 주제는 폴더 밖으로 이동됩니다.`, ok: '삭제', danger: true })) { removeFolder(sb, f); save.folders(); renderManage(); }
+    } else if (a === 'trename') {
+      const t = b.closest('.topic').dataset.t;
+      const v = await dialog({ title: '주제 이름 수정', text: `"${sb}" 과목의 주제`, input: { value: t, placeholder: '주제 이름' }, ok: '저장' });
+      const n = v && v.trim();
+      if (!n || n === t) return;
+      if (D[sb][n]) return toast('이미 있는 주제입니다', 'bad');
+      const nd = {}; for (const k of Object.keys(D[sb])) nd[k === t ? n : k] = D[sb][k];
+      D[sb] = nd;
+      if (TF[sb]?.[t]) { const f = TF[sb][t]; delete TF[sb][t]; TF[sb][n] = f; }
+      W.forEach(w => { if (w.subject === sb && w.topic === t) w.topic = n; });
+      if (openSec.delete(kT(sb, t))) openSec.add(kT(sb, n));
+      save.data(); save.folders(); save.wrong(); renderManage(); datalists(); renderHome(); renderBadges();
+      toast(`이름 수정됨 · ${n}`);
     } else if (a === 'tdel') {
       const t = b.closest('.topic').dataset.t;
       if (await dialog({ title: '주제 삭제', text: `"${sb} · ${t}"의 문제 ${D[sb][t].length}개를 모두 삭제할까요?`, ok: '삭제', danger: true })) {
