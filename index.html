@@ -1800,7 +1800,11 @@ async function exportBackup(sel, withWrong) {
     (cd[s] ??= {})[t] = D[s][t];
     const f = folderOf(s, t); if (f) (tf[s] ??= {})[t] = f;
   });
-  for (const s in cd) { const used = new Set(Object.values(tf[s] || {})); const l = folderList(s).filter(f => used.has(f)); if (l.length) cf[s] = l; }
+  for (const s in cd) {
+    const used = new Set(Object.values(tf[s] || {})), held = new Set(Object.values(TF[s] || {}));
+    const l = folderList(s).filter(f => used.has(f) || !held.has(f));   // 선택한 주제가 든 폴더 + 주제가 하나도 없는 빈 폴더
+    if (l.length) cf[s] = l;
+  }
   const wn = withWrong ? W.filter(n => sel.has(xk(n.subject, n.topic))) : [];
   const total = subjects().reduce((n, s) => n + topicsOf(s).length, 0);
   const partial = sel.size < total;
@@ -1983,23 +1987,48 @@ const cloud = (() => {
     if (ch) { hydrateW(); queueSave(K.wrong, W); }
     return ch;
   }
+  /* 폴더 정보 3-way 병합: 마지막 동기화 상태(b) / 이 기기(l) / 클라우드(r).
+   * 한쪽만 바뀐 항목은 그쪽 값을 따르고, 이 기기에서 새로 만든 빈 폴더는 클라우드에 없어도 지우지 않는다. */
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  function mergeList(b, l, r) {
+    b = b || []; l = l || []; r = r || [];
+    if (same(l, b)) return r;
+    if (same(r, b)) return l;
+    const out = l.filter(x => !(b.includes(x) && !r.includes(x)));
+    r.forEach(x => { if (!b.includes(x) && !out.includes(x)) out.push(x); });
+    return out;
+  }
+  function mergeMap(b, l, r) {
+    b = b || {}; l = l || {}; r = r || {};
+    const out = {};
+    for (const t of new Set([...Object.keys(b), ...Object.keys(l), ...Object.keys(r)])) {
+      const v = l[t] === b[t] ? r[t] : r[t] === b[t] ? l[t] : l[t];
+      if (v) out[t] = v;
+    }
+    return out;
+  }
+  function mergeMeta(b, l, r) {
+    const keys = k => new Set([...Object.keys(b[k] || {}), ...Object.keys(l[k] || {}), ...Object.keys(r[k] || {})]);
+    const o = { tf: {}, cf: {}, et: {} };
+    keys('tf').forEach(s => { const m = mergeMap(b.tf?.[s], l.tf?.[s], r.tf?.[s]); if (Object.keys(m).length) o.tf[s] = m; });
+    ['cf', 'et'].forEach(k => keys(k).forEach(s => { const a = mergeList(b[k]?.[s], l[k]?.[s], r[k]?.[s]); if (a.length) o[k][s] = a; }));
+    return o;
+  }
   function applyM(snap) {
-    const v = snap.exists ? snap.data() : null, ls = JSON.stringify(metaObj()), lh = hs(ls);
+    const v = snap.exists ? snap.data() : null;
+    syncET();
+    const L = metaObj(), lh = hs(JSON.stringify(L));
     const empty = !Object.keys(TF).length && !Object.keys(CF).length && !Object.keys(ET).length;
     if (!v || typeof v.j !== 'string') { if (!empty) { dirty.add('m'); schedule(); } return false; }
     const rh = hs(v.j);
-    if (P.m && lh !== P.m) { dirty.add('m'); schedule(); return false; }
-    if (lh === rh) { P.m = rh; return false; }
-    let p; try { p = JSON.parse(v.j); } catch { return false; }
-    if (!P.m && !empty) {                                   // 처음 연결: 폴더 정보 합치기
-      const tf = p.tf || {}, cf = p.cf || {};
-      for (const s in TF) tf[s] = { ...TF[s], ...(tf[s] || {}) };
-      for (const s in CF) cf[s] = [...new Set([...(cf[s] || []), ...CF[s]])];
-      const et = p.et || {}; for (const s in ET) et[s] = [...new Set([...(et[s] || []), ...ET[s]])];
-      p = { tf, cf, et }; dirty.add('m'); schedule(); P.m = '';
-    } else P.m = rh;
-    TF = p.tf || {}; CF = p.cf || {}; ET = p.et || {}; ensureTopics(); queueSave(K.folders, TF); queueSave(K.created, CF); queueSave(K.empty, ET);
-    return true;
+    if (lh === rh) { P.m = rh; P.mb = L; return false; }
+    let R; try { R = JSON.parse(v.j); } catch { return false; }
+    const M = mergeMeta(P.mb || {}, L, R || {});      // 기준이 없으면(처음 연결/업데이트 직후) 합집합
+    TF = M.tf; CF = M.cf; ET = M.et; ensureTopics();
+    queueSave(K.folders, TF); queueSave(K.created, CF); queueSave(K.empty, ET);
+    const mh = hs(JSON.stringify(metaObj()));
+    if (mh !== rh) { dirty.add('m'); schedule(); } else { P.m = rh; P.mb = JSON.parse(JSON.stringify(metaObj())); }
+    return mh !== lh;
   }
 
   async function put(ref, o, id, kind) {
@@ -2009,7 +2038,7 @@ const cloud = (() => {
   async function pushKind(kind) {
     if (kind === 'm') {
       const ser = JSON.stringify(metaObj()), h = hs(ser), empty = !Object.keys(TF).length && !Object.keys(CF).length && !Object.keys(ET).length;
-      if (h !== P.m && !(empty && !P.m)) { await mRef.set({ j: ser }); P.m = h; }
+      if (h !== P.m && !(empty && !P.m)) { await mRef.set({ j: ser }); P.m = h; P.mb = JSON.parse(ser); }
       return;
     }
     const loc = kind === 'q' ? localQ() : localW(), c = col[kind], Pk = P[kind];
@@ -2081,7 +2110,7 @@ const cloud = (() => {
     }
   }
   async function start(saved) {
-    if (saved && typeof saved === 'object') P = { q: saved.q || {}, w: saved.w || {}, m: saved.m || '' };
+    if (saved && typeof saved === 'object') P = { q: saved.q || {}, w: saved.w || {}, m: saved.m || '', mb: saved.mb || null };
     if (FB_CONFIG.apiKey && window.firebase) { try { return startFb(); } catch (e) { console.error(e); return setSt('off'); } }
     if (!window.claude?.use) return setSt('off');
     setSt('conn');
